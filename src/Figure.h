@@ -6,6 +6,18 @@
 
 #include <windows.h>
 
+/*
+TODO:
+-scientific notation in writing strings
+-plot for x, y
+-exceptions
+-repair overflowing of points on y axis
+-add y ticks
+*/
+
+// define floating-point error comparison allowance
+#define FP_ERROR 0.001
+
 // COLORS
 #define BLACK RGB(0, 0, 0)
 #define BLUE RGB(0, 0, 255)
@@ -27,6 +39,21 @@
 // defines adjustment of left, right, up and bottom regions
 #ifndef ADJUSTMENT_GRAPH
 #define ADJUSTMENT_GRAPH 0.05
+#endif
+
+// define space between the window and graph = usable rectangle
+#ifndef ADJUSTMENT_WINDOW
+#define ADJUSTMENT_WINDOW 10
+#endif
+
+// define ratio of attribute to the width of the whole usable rectangle
+#ifndef ATTRIBUTE_DISTANCE
+#define ATTRIBUTE_DISTANCE 0.12
+#endif
+
+// define ratio of tick stick w.r.t. the abslute attribute distance
+#ifndef TICK_RATIO
+#define TICK_RATIO 0.2
 #endif
 
 int InitializeWindow(int width, int height);
@@ -104,10 +131,10 @@ namespace cpplot {
 	{
 		// Set the adjusted min and max values, adjusted for the free space before/after 
 		// first/last point
-		double adj_max_x = range[1] + (range[1] - range[0]) * ADJUSTMENT_GRAPH;
-		double adj_min_x = range[0] - (range[1] - range[0]) * ADJUSTMENT_GRAPH;
-		double adj_max_y = range[3] + (range[3] - range[2]) * ADJUSTMENT_GRAPH;
-		double adj_min_y = range[2] - (range[3] - range[2]) * ADJUSTMENT_GRAPH;
+		double adj_min_x = range[0];
+		double adj_max_x = range[1];
+		double adj_min_y = range[2];
+		double adj_max_y = range[3];
 
 		// Pre-compute variables
 		double win_length_x = rect.right - rect.left;
@@ -186,13 +213,10 @@ namespace cpplot {
 
 	void Line::show(HDC hdc, HWND hwnd, RECT rect, const std::vector<double>& range) const
 	{
-		
-		// Set the adjusted min and max values, adjusted for the free space before/after 
-		// first/last point
-		double adj_max_x = range[1] + (range[1] - range[0]) * ADJUSTMENT_GRAPH;
-		double adj_min_x = range[0] - (range[1] - range[0]) * ADJUSTMENT_GRAPH;
-		double adj_max_y = range[3] + (range[3] - range[2]) * ADJUSTMENT_GRAPH;
-		double adj_min_y = range[2] - (range[3] - range[2]) * ADJUSTMENT_GRAPH;
+		double adj_min_x = range[0];
+		double adj_max_x = range[1];
+		double adj_min_y = range[2];
+		double adj_max_y = range[3];
 
 		// Pre-compute variables
 		double win_length_x = rect.right - rect.left;
@@ -228,23 +252,149 @@ namespace cpplot {
 	class Axis
 	{
 	public:
-		virtual void prepare(const std::string& str);
-
-		virtual void show(HDC hdc, HWND hwnd, RECT rect, const std::vector<double>& range) const;
-
-		virtual ~Axis() = default;
-
-	private:
-		std::string text;
+		void show(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect, const std::vector<double>& range) const;
 	};
 
-	void Axis::prepare(const std::string& str)
+	void Axis::show(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect, const std::vector<double>& range) const
 	{
-		text = str;
-	}
+		/* *********************************
+		// X axis ticks and values rendering
+		********************************* */
 
-	void Axis::show(HDC hdc, HWND hwnd, RECT rect, const std::vector<double>& range) const
-	{
+		double factor = 0.0;
+		double x_diff = range[1] - range[0];
+		unsigned int op_sign = 0; // nothing, mult or div
+
+		// Find the multiplicative/divisive factor
+		if ((x_diff + FP_ERROR) < 10.0)
+		{
+			op_sign = 1;
+
+			factor += 1.0;
+			x_diff *= 10.0;
+
+			while ((x_diff + FP_ERROR) < 10.0)
+			{
+				factor += 1.0;
+				x_diff *= 10.0;
+			}
+		}
+		else if ((x_diff - FP_ERROR) >= 100.0)
+		{
+			op_sign = 2;
+
+			factor += 1.0;
+			x_diff /= 10.0;
+
+			while ((x_diff - FP_ERROR) >= 100.0)
+			{
+				factor += 1.0;
+				x_diff /= 10.0;
+			}
+		}
+
+		// Find the appropriate tick and value dispersion 
+		double x_value_period = 2.0;
+		double x_tick_period = 1.0;
+		if (x_diff >= 20.0 && x_diff < 40.0)
+		{
+			x_value_period = 5.0;
+			x_tick_period = 2.5;
+		}
+		else if (x_diff >= 40.0)
+		{
+			x_value_period = 10.0;
+			x_tick_period = 5.0;
+		}
+		
+		// Set the graph-specific tick and value dispersion
+		double x_value_period_adj = x_value_period;
+		double x_tick_period_adj = x_tick_period;
+		switch (op_sign)
+		{
+		case 1 :
+		{
+			x_value_period_adj /= pow(10.0, factor);
+			x_tick_period_adj /= pow(10.0, factor);
+		}
+		break;
+		case 2 :
+		{
+			x_value_period_adj *= pow(10.0, factor);
+			x_tick_period_adj *= pow(10.0, factor);
+		}
+		break;
+		}
+
+		// Find the starting values for the first tick and value
+		unsigned int value_divisor = (int)ceil(range[0] / x_value_period_adj);
+		unsigned int tick_divisor = (int)ceil(range[0] / x_tick_period_adj);
+
+		double value = value_divisor * x_value_period_adj;
+		double tick = tick_divisor * x_tick_period_adj;
+
+		// Pre-compute variables
+		double win_length_x = x_rect.right - x_rect.left;
+		double length_x = range[1] - range[0];
+
+		unsigned int x_coord, y_coord = x_rect.top;
+		unsigned int x_stick = (unsigned int)((x_rect.bottom - x_rect.top) * TICK_RATIO);
+
+		// Set graphics attributes
+		HPEN hBoxPen = CreatePen(PS_SOLID, 1, BLACK);
+		SelectObject(hdc, hBoxPen);
+
+		// Render ticks
+		while (tick < range[1])
+		{
+			x_coord = x_rect.left +
+				(unsigned int)round((tick - range[0]) * win_length_x / length_x);
+
+			MoveToEx(hdc, x_coord, y_coord, NULL);
+			LineTo(hdc, x_coord, y_coord + x_stick);
+
+			tick += x_tick_period_adj;
+		}
+
+		// Render values
+		int text_factor = 2; // adjustment of the value below the bottom of the graph
+		y_coord += text_factor * x_stick;
+		std::wstring text;
+
+		// Test needed due to correct rendering of the notation of the number
+		if (op_sign == 0 || op_sign == 2)
+		{
+			while (value < range[1])
+			{
+				x_coord = x_rect.left +
+					(unsigned int)round((value - range[0]) * win_length_x / length_x);
+
+
+				text = std::to_wstring((int)value);
+				TextOut(hdc, x_coord, y_coord, text.c_str(), text.size());
+
+				value += x_value_period_adj;
+			}
+		}
+		else
+		{
+			while (value < range[1])
+			{
+				x_coord = x_rect.left +
+					(unsigned int)round((value - range[0]) * win_length_x / length_x);
+
+				text = std::to_wstring(value);
+				TextOut(hdc, x_coord, y_coord, text.c_str(), text.size());
+
+				value += x_value_period_adj;
+			}
+		}
+
+		DeleteObject(hBoxPen);
+
+		/* *********************************
+		// Y axis ticks and values rendering
+		********************************* */
 
 	}
 
@@ -277,6 +427,7 @@ namespace cpplot {
 
 	private:
 		Graph **graph;
+		Axis *axis_ticks;
 		std::allocator<Graph*> alloc;
 
 		COLORREF background_color;
@@ -293,9 +444,34 @@ namespace cpplot {
 		HBRUSH hBackgroundBrush = CreateSolidBrush(background_color);
 		FillRgn(hdc, BackgroundRegion, hBackgroundBrush);
 		*/
-		
+
 		// Set rectangle for graph space
-		RECT graph_rect = { rect.left + 10, rect.top + 10, rect.right - 10, rect.bottom - 10 };
+		RECT graph_rect = { 
+			rect.left + ADJUSTMENT_WINDOW, 
+			rect.top + ADJUSTMENT_WINDOW,
+			rect.right - ADJUSTMENT_WINDOW,
+			rect.bottom - ADJUSTMENT_WINDOW 
+		};
+
+		// Set rectangle for axis and values on axis
+		RECT x_ticks, y_ticks;
+
+		x_ticks.bottom = graph_rect.bottom;
+		x_ticks.top = x_ticks.bottom - (unsigned int)(ATTRIBUTE_DISTANCE * (graph_rect.bottom - graph_rect.top));
+
+		y_ticks.left = graph_rect.left;
+		y_ticks.right = y_ticks.left + (unsigned int)(ATTRIBUTE_DISTANCE * (graph_rect.right - graph_rect.left));
+
+		// Adjust the graph rectangle
+		graph_rect.bottom = x_ticks.top;
+		graph_rect.left = y_ticks.right;
+
+		// Adjust the x and y tick rectangles
+		x_ticks.right = graph_rect.right;
+		x_ticks.left = graph_rect.left;
+
+		y_ticks.top = graph_rect.top;
+		y_ticks.bottom = graph_rect.bottom;
 		
 		// Draw and fill the enclosing rectangle
 		HPEN hBoxPen = CreatePen(PS_SOLID, 1, BLACK);
@@ -312,9 +488,10 @@ namespace cpplot {
 
 		// Delete the graphics objects
 		DeleteObject(hBoxPen);
+		DeleteObject(hGraphBrush);
 
-		// Set rectangle for adjacent objects
-		// TODO
+		// Call the rendering of axis ticks and value signs
+		axis_ticks->show(hdc, hwnd, x_ticks, y_ticks, xy_range);
 	}
 
 	inline void Window::prepare(const std::vector<double>& in_x, const std::vector<double>& in_y, 
@@ -339,6 +516,16 @@ namespace cpplot {
 		// Send the variables to the Graph object
 		graph[active_graph++]->prepare(in_x, in_y, in_size, in_color, xy_range);
 
+		// Set the adjusted min and max values, adjusted for the free space before/after 
+		// first/last point at the initialization point
+		if (!initialized)
+		{
+			xy_range[1] += (xy_range[1] - xy_range[0]) * ADJUSTMENT_GRAPH;
+			xy_range[0] -= (xy_range[1] - xy_range[0]) * ADJUSTMENT_GRAPH;
+			xy_range[3] += (xy_range[3] - xy_range[2]) * ADJUSTMENT_GRAPH;
+			xy_range[2] -= (xy_range[3] - xy_range[2]) * ADJUSTMENT_GRAPH;
+		}
+
 		// Initialization of the window succedded
 		initialized = true;
 	}
@@ -348,7 +535,7 @@ namespace cpplot {
 	{
 		// Create points on the x-axis
 		std::vector<double> x(in_y.size());
-		for (unsigned int i = 0; i != x.size(); ++i)
+		for (unsigned int i = 1; i < x.size(); ++i)
 		{
 			x[i] = i;
 		}
@@ -371,6 +558,16 @@ namespace cpplot {
 
 		// Send the variables to the Graph object
 		graph[active_graph++]->prepare(x, in_y, in_size, in_color, xy_range);
+
+		// Set the adjusted min and max values, adjusted for the free space before/after 
+		// first/last point at the initialization point
+		if (!initialized)
+		{
+			xy_range[1] += (xy_range[1] - xy_range[0]) * ADJUSTMENT_GRAPH;
+			xy_range[0] -= (xy_range[1] - xy_range[0]) * ADJUSTMENT_GRAPH;
+			xy_range[3] += (xy_range[3] - xy_range[2]) * ADJUSTMENT_GRAPH;
+			xy_range[2] -= (xy_range[3] - xy_range[2]) * ADJUSTMENT_GRAPH;
+		}
 
 		// Initialization of the window succedded
 		initialized = true;
@@ -461,15 +658,14 @@ namespace cpplot {
 			::InitializeWindow(win_width, win_height);
 		};
 
-		void paint(HDC hdc, HWND hwnd);
+		void paint(HDC hdc, HWND hwnd, RECT client_area);
 
 	private:
-		RECT client_rect; // rectangle specifying coordinates of the client area of GUI window
 		unsigned int x_dim, y_dim; // dimensionality of the plotting area
 		std::allocator<Window> alloc;
 		Window * windows; // array of individual plots
 		unsigned int win_width, win_height; // Width and Height of the GUI window
-		const std::vector<unsigned int> width, height; // user specified width and height
+		std::vector<unsigned int> width, height; // user specified width and height
 		std::vector<COLORREF> colors; // user specified colors of the windows
 
 		int active_window;
@@ -581,15 +777,41 @@ namespace cpplot {
 		windows[loc_active_window].prepare(y, type, width, color);
 	}
 
-	inline void Figure::paint(HDC hdc, HWND hwnd)
+	inline void Figure::paint(HDC hdc, HWND hwnd, RECT client_area)
 	{
 		unsigned int pos_x;
 		unsigned int pos_y;
 		RECT rect;
 
+		// Adjust new coordinates to the possibly resized window
+		double width_ratio = (double)(client_area.right - client_area.left) / (double)win_width;
+		double height_ratio = (double)(client_area.bottom - client_area.top) / (double)win_height;
+
+		for (int i = 0; i != width.size(); ++i)
+		{
+			width[i] = (int)(width[i] * width_ratio);
+		}
+
+		for (int i = 0; i != height.size(); ++i)
+		{
+			height[i] = (int)(height[i] * height_ratio);
+		}
+
+		win_width = client_area.right - client_area.left;
+		win_height = client_area.bottom - client_area.top;
+
 		// Plot the individual windows
 		for (unsigned int i = 0; i != (x_dim * y_dim); ++i)
 		{
+			// Set default fonts
+			HFONT hFont = CreateFont(20, 0, 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, ANSI_CHARSET,
+				OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH |
+				FF_SWISS, L"Arial");
+			SendMessage(hwnd, WM_SETFONT, WPARAM(hFont), TRUE);
+
+			// Set default text alignment 
+			SetTextAlign(hdc, TA_CENTER);
+
 			// Compute the position of the window in the plot
 			pos_x = i / y_dim;
 			pos_y = i - pos_x * y_dim;
@@ -636,11 +858,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
 		PAINTSTRUCT ps;
 
+		RECT client_area;
+		GetClientRect(hwnd, &client_area);
+
 		HDC hdc = BeginPaint(hwnd, &ps);
-		cpplot::Globals::figure->paint(hdc, hwnd);
+		cpplot::Globals::figure->paint(hdc, hwnd, client_area);
 		EndPaint(hwnd, &ps);
 	}
 	break;
+
+	case WM_WINDOWPOSCHANGED:
+	{
+		SendMessage(hwnd, WM_PAINT, NULL, NULL);
+	}
 
 	case WM_KEYDOWN:
 	{
@@ -705,7 +935,7 @@ int InitializeWindow(int width, int height)
 		WS_EX_CLIENTEDGE,
 		wc.lpszClassName,
 		L"Plot",
-		NULL,
+		WS_SYSMENU | WS_CAPTION | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SIZEBOX,
 		CW_USEDEFAULT, CW_USEDEFAULT, width, height,
 		NULL, NULL, hInstance, NULL);
 
