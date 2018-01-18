@@ -18,14 +18,14 @@ int main()
 	std::vector<double> z(length);
 	for (int i = 0; i != length; ++i)
 	{
-		y[i] = (double)rand() / (double)RAND_MAX;
-		z[i] = 1.0 + (double)rand() / (double)RAND_MAX;
+		y[i] = - 5.0 * (double)rand() / (double)RAND_MAX;
+		z[i] = - 10.0 * (double)rand() / (double)RAND_MAX;
 	}
 	
 	for (unsigned int i = 0; i != 2; ++i)
 	{
-		plt.plot(y, "scatter", 5, BLUE, { i, 0 });
-		plt.plot(z, "scatter", 5, RED, { i, 0 });
+		plt.plot(y, "line", 1, BLUE, { i, 0 });
+		plt.plot(z, "line", 1, RED, { i, 0 });
 		
 		/*
 		plt.legend(" ");
@@ -34,6 +34,7 @@ int main()
 		plt.ylabel(" ");
 		*/
 	}
+	plt.set_font();
 	plt.show();
 	
 	return 0;
