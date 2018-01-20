@@ -3,6 +3,7 @@
 #pragma comment(lib, "Gdi32.lib")
 
 #include "Header.h"
+#include "Bitmap.h"
 
 #include <windows.h>
 
@@ -11,6 +12,7 @@ TODO:
 -scientific notation in writing strings
 -plot for x, y
 -exceptions
+-finish assymetric Figure constructor
 */
 
 // define floating-point error comparison allowance
@@ -68,7 +70,8 @@ namespace cpplot {
 		static constexpr unsigned int size = 10;
 		static wchar_t FigureName[size];
 		static unsigned int counter = 0;
-		static cpplot::Figure *figure;
+		static cpplot::Figure *figure = nullptr;
+		static wchar_t *dir = nullptr;
 	};
 
 	// Abstract Base Class
@@ -250,11 +253,54 @@ namespace cpplot {
 	class Axis
 	{
 	public:
-		void show(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect, const std::vector<double>& range) const;
+		void show(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect, 
+			const std::vector<double>& range, HFONT font) const;
+
+		bool get_xlabel() 
+		{
+			if (!xlabel.empty())
+			{
+				return true;
+			}
+
+			return false;
+		}
+
+		bool get_ylabel()
+		{
+			if (!ylabel.empty())
+			{
+				return true;
+			}
+
+			return false;
+		}
+
+		void set_xlabel(std::string xlab) {	xlabel = xlab; }
+
+		void set_ylabel(std::string ylab) {	ylabel = ylab; }
+
+	private:
+		std::string xlabel;
+		std::string ylabel;
 	};
 
-	void Axis::show(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect, const std::vector<double>& range) const
+	void Axis::show(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect, 
+		const std::vector<double>& range, HFONT font) const
 	{
+		// Set default text alignment
+		unsigned int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_TOP);
+
+		// Get parameters of current font -> for proper rendering of axis values
+		TEXTMETRIC textMetric;
+		GetTextMetrics(hdc, &textMetric);
+
+		// Set length of axis ticks
+		unsigned int x_stick = (unsigned int)(((x_rect.bottom - x_rect.top) - 
+			2.0 * textMetric.tmHeight) / 3.0);
+		unsigned int y_stick = (unsigned int)(((y_rect.right - y_rect.left) - 
+			2.0 * textMetric.tmHeight) / 3.0);
+
 		/* *********************************
 		// X axis ticks and values rendering
 		********************************* */
@@ -337,9 +383,6 @@ namespace cpplot {
 
 		unsigned int x_coord, y_coord = x_rect.top;
 		
-		// Stick length needs to be equal for x and y axis
-		unsigned int stick = (unsigned int)((x_rect.bottom - x_rect.top) * TICK_RATIO);
-
 		// Set graphics attributes
 		HPEN hBoxPen = CreatePen(PS_SOLID, 1, BLACK);
 		SelectObject(hdc, hBoxPen);
@@ -351,14 +394,14 @@ namespace cpplot {
 				(unsigned int)round((x_tick - range[0]) * win_length_x / length_x);
 
 			MoveToEx(hdc, x_coord, y_coord, NULL);
-			LineTo(hdc, x_coord, y_coord + stick);
+			LineTo(hdc, x_coord, y_coord + x_stick);
 
 			x_tick += x_tick_period_adj;
 		}
 
 		// Render values
 		int text_factor = 2; // adjustment of the value below the bottom of the graph
-		y_coord += text_factor * stick;
+		y_coord += text_factor * x_stick;
 		std::wstring x_text;
 
 		// Test needed due to correct rendering of the notation of the number
@@ -389,6 +432,15 @@ namespace cpplot {
 				x_value += x_value_period_adj;
 			}
 		}
+
+		// Write the label of x axis
+		unsigned int x_coord_xlabel = (x_rect.right + x_rect.left) / 2;
+		unsigned int y_coord_xlabel = x_rect.top + 3 * x_stick + textMetric.tmHeight;
+		wchar_t * wide_xlabel = new wchar_t[xlabel.size() + 1];
+		MultiByteToWideChar(CP_UTF8, 0, xlabel.c_str(), -1, wide_xlabel, xlabel.size() + 1);
+		TextOut(hdc, x_coord_xlabel, y_coord_xlabel, wide_xlabel, xlabel.size());
+		
+		delete[] wide_xlabel;
 
 		/* *********************************
 		// Y axis ticks and values rendering
@@ -472,7 +524,6 @@ namespace cpplot {
 		double length_y = range[3] - range[2];
 
 		x_coord = y_rect.right;
-		unsigned int y_stick = 9;
 
 		// Render ticks
 		while (y_tick < range[3])
@@ -487,16 +538,18 @@ namespace cpplot {
 		}
 
 		// Render values
-		x_coord -= (unsigned int)(1.5 * text_factor * y_stick);
+		x_coord -= (unsigned int)(text_factor * y_stick);
 		std::wstring y_text;
 
-		// Right-align the textual output
-		unsigned int prev_text_align = SetTextAlign(hdc, TA_RIGHT);
+		// Set bottom and center text alignment
+		SetTextAlign(hdc, TA_CENTER | TA_BOTTOM);
 
-		// Adjust the height so it is centered vertically -> no default option in SetTextAlign
-		TEXTMETRIC textMetric;
-		GetTextMetrics(hdc, &textMetric);
-		unsigned int height_adj = (unsigned int)(textMetric.tmHeight * 0.5);
+		// Set font rotated by 90 degrees
+		LOGFONT lf;
+		GetObject(font, sizeof(LOGFONT), &lf);
+		lf.lfEscapement = 900;
+		HFONT lfont = CreateFontIndirect(&lf);
+		HFONT h_prev_font = (HFONT)SelectObject(hdc, (HGDIOBJ)(HFONT)(lfont));
 
 		// Test needed due to correct rendering of the notation of the number
 		if (y_op_sign == 0 || y_op_sign == 2)
@@ -507,7 +560,7 @@ namespace cpplot {
 					(unsigned int)round((y_value - range[2]) * win_length_y / length_y);
 
 				y_text = std::to_wstring((int)y_value);
-				TextOut(hdc, x_coord, y_coord - height_adj, y_text.c_str(), y_text.size());
+				TextOut(hdc, x_coord, y_coord, y_text.c_str(), y_text.size());
 
 				y_value += y_value_period_adj;
 			}
@@ -520,13 +573,24 @@ namespace cpplot {
 					(unsigned int)round((y_value - range[2]) * win_length_y / length_y);
 
 				y_text = std::to_wstring(y_value);
-				TextOut(hdc, x_coord, y_coord - height_adj, y_text.c_str(), y_text.size());
+				TextOut(hdc, x_coord, y_coord, y_text.c_str(), y_text.size());
 
 				y_value += y_value_period_adj;
 			}
 		}
 
+		// Write the label of y axis
+		unsigned int x_coord_ylabel = y_rect.right - 3 * y_stick - textMetric.tmHeight;
+		unsigned int y_coord_ylabel = (y_rect.bottom + y_rect.top) / 2;
+		wchar_t * wide_ylabel = new wchar_t[ylabel.size() + 1];
+		MultiByteToWideChar(CP_UTF8, 0, ylabel.c_str(), -1, wide_ylabel, ylabel.size() + 1);
+		TextOut(hdc, x_coord_ylabel, y_coord_ylabel, wide_ylabel, ylabel.size());
+
+		delete[] wide_ylabel;
+
+		// Set text alignment and font that was in place before rendering axis attributes
 		SetTextAlign(hdc, prev_text_align);
+		SelectObject(hdc, h_prev_font);
 
 		// Set previous graphics properties and delete graphic objects
 		DeleteObject(hBoxPen);
@@ -541,7 +605,7 @@ namespace cpplot {
 		Window(COLORREF in_color) :
 			background_color(in_color), initialized{ false }, first_show{ false },
 			active_graph { 0 }, max_graphs{ MAX_GRAPHS }, 
-			xy_range{ INFINITY, -INFINITY, INFINITY, -INFINITY }
+			xy_range{ INFINITY, -INFINITY, INFINITY, -INFINITY }, axis{ new Axis() }
 		{
 			graph = alloc.allocate(max_graphs);
 		};
@@ -552,17 +616,21 @@ namespace cpplot {
 		void prepare(const std::vector<double>& in_y, std::string in_type, unsigned int in_size, 
 			COLORREF in_color);
 
-		void show(HDC hdc, HWND hwnd, RECT rect);
+		void show(HDC hdc, HWND hwnd, RECT rect, HFONT font);
 
 		bool init_test() const { return initialized; }
 
 		void resize();
 
+		void set_xlabel(std::string xlab);
+
+		void set_ylabel(std::string ylab);
+
 		~Window();
 
 	private:
 		Graph **graph;
-		Axis *axis_ticks;
+		Axis * axis;
 		std::allocator<Graph*> alloc;
 
 		COLORREF background_color;
@@ -572,7 +640,7 @@ namespace cpplot {
 		std::vector<double> xy_range; // min_x, max_x, min_y, max_y
 	};
 
-	inline void Window::show(HDC hdc, HWND hwnd, RECT rect)
+	inline void Window::show(HDC hdc, HWND hwnd, RECT rect, HFONT font)
 	{
 		/*
 		// Fill the client area with a brush TODO
@@ -601,14 +669,29 @@ namespace cpplot {
 			rect.bottom - ADJUSTMENT_WINDOW 
 		};
 
+		// Get parameters of current font and get the offset of 
+		TEXTMETRIC textMetric;
+		GetTextMetrics(hdc, &textMetric);
+
+		// TODO : PARAMETERS AS COMPILER CONSTANTS
+		double ratio = 1.5 / 5.0;
+		double x_offset = textMetric.tmHeight * 
+			(axis->get_xlabel() ? 5 : (4 / 1.5));
+		double y_offset = textMetric.tmHeight * 
+			(axis->get_ylabel() ? 5 : (4 / 1.5));
+		
+		HPEN hBoxPen = CreatePen(PS_SOLID, 1, BLACK);
+		HGDIOBJ prev_hBoxPen = SelectObject(hdc, hBoxPen);
+		// Rectangle(hdc, graph_rect.left, graph_rect.top, graph_rect.right, graph_rect.bottom);
+
 		// Set rectangle for axis and values on axis
 		RECT x_ticks, y_ticks;
 
 		x_ticks.bottom = graph_rect.bottom;
-		x_ticks.top = x_ticks.bottom - (unsigned int)(ATTRIBUTE_DISTANCE * (graph_rect.bottom - graph_rect.top));
+		x_ticks.top = (unsigned int)(x_ticks.bottom - x_offset);
 
 		y_ticks.left = graph_rect.left;
-		y_ticks.right = y_ticks.left + (unsigned int)(ATTRIBUTE_DISTANCE * (graph_rect.right - graph_rect.left));
+		y_ticks.right = (unsigned int)(y_ticks.left + y_offset);
 
 		// Adjust the graph rectangle
 		graph_rect.bottom = x_ticks.top;
@@ -622,10 +705,10 @@ namespace cpplot {
 		y_ticks.bottom = graph_rect.bottom;
 		
 		// Draw and fill the enclosing rectangle
-		HPEN hBoxPen = CreatePen(PS_SOLID, 1, BLACK);
+		hBoxPen = CreatePen(PS_SOLID, 1, BLACK);
 		HBRUSH hGraphBrush = CreateSolidBrush(background_color);
 		SelectObject(hdc, hBoxPen);
-		SelectObject(hdc, hGraphBrush);
+		HGDIOBJ prev_hGraphBrush = SelectObject(hdc, hGraphBrush);
 		Rectangle(hdc, graph_rect.left, graph_rect.top, graph_rect.right, graph_rect.bottom);
 
 		// Paint individual graphs
@@ -634,12 +717,14 @@ namespace cpplot {
 			graph[i]->show(hdc, hwnd, graph_rect, xy_range);
 		}
 
-		// Delete the graphics objects
+		// Set previous options and delete graphics objects
+		SelectObject(hdc, prev_hBoxPen);
+		SelectObject(hdc, prev_hGraphBrush);
 		DeleteObject(hBoxPen);
 		DeleteObject(hGraphBrush);
 
 		// Call the rendering of axis ticks and value signs
-		axis_ticks->show(hdc, hwnd, x_ticks, y_ticks, xy_range);
+		axis->show(hdc, hwnd, x_ticks, y_ticks, xy_range, font);
 	}
 
 	inline void Window::prepare(const std::vector<double>& in_x, const std::vector<double>& in_y, 
@@ -701,6 +786,16 @@ namespace cpplot {
 		initialized = true;
 	}
 
+	inline void Window::set_xlabel(std::string xlab)
+	{
+		axis->set_xlabel(xlab);
+	}
+
+	inline void Window::set_ylabel(std::string ylab)
+	{
+		axis->set_ylabel(ylab);
+	}
+
 	inline void Window::resize() 
 	{ 
 		// Allocate new, larger, storage
@@ -736,6 +831,9 @@ namespace cpplot {
 		{
 			printf("WARNING: There should be no reason to call the destructor at this point!");
 		}
+
+		// Delete Axis object
+		delete axis;
 	}
 
 	class Figure
@@ -752,17 +850,7 @@ namespace cpplot {
 		Figure& operator=(const Figure& figure) = delete;
 		
 		// Destructor
-		~Figure() 
-		{ 
-			// Deallocate the storage of inidividual objects allocated with placement new
-			for (unsigned int i = 0; i != (y_dim * x_dim); ++i)
-			{
-				windows[i].~Window();
-			};
-
-			// Free the buffer allocated by malloc
-			alloc.deallocate(windows, x_dim * y_dim);
-		};
+		~Figure();
 
 		void plot(const std::vector<double>& x, const std::vector<double>& y, 
 			std::string type = "line", unsigned int width = 1, COLORREF color = WHITE,
@@ -772,13 +860,13 @@ namespace cpplot {
 			unsigned int width = 1, COLORREF color = WHITE, std::vector<unsigned int> position = 
 			std::vector<unsigned int>{});
 
-		void legend(std::string leg);
+		void legend(std::string leg) {};
 
 		void xlabel(std::string xlab);
 
 		void ylabel(std::string ylab);
 
-		void title(std::string title);
+		void title(std::string title) {};
 
 		void show()
 		{
@@ -795,6 +883,10 @@ namespace cpplot {
 
 		void paint(HDC hdc, HWND hwnd, RECT client_area);
 
+		void save(std::string file);
+
+		wchar_t *file_dir; // file directory -> public because needs to be seen by callback 
+
 	private:
 		unsigned int x_dim, y_dim; // dimensionality of the plotting area
 		std::allocator<Window> alloc;
@@ -810,7 +902,7 @@ namespace cpplot {
 	Figure::Figure(const std::vector<unsigned int>& in_width, const std::vector<unsigned int>& in_height, 
 		const std::vector<COLORREF>& in_colors) : x_dim{ in_width.size() }, y_dim{ in_height.size() }, 
 		width{ in_width }, height{ in_height }, colors{ in_colors }, win_height{ 0 }, win_width{ 0 }, 
-		active_window { -1 }
+		active_window { -1 }, file_dir{ nullptr }
 	{
 		// Set default font
 		LOGFONT lf;
@@ -856,7 +948,8 @@ namespace cpplot {
 	}
 
 	Figure::Figure(unsigned int in_width, unsigned int in_height, COLORREF colors) : 
-		x_dim{ 1 }, y_dim{ 1 }, width(1, in_width), height(1, in_height), active_window{ -1 }
+		x_dim{ 1 }, y_dim{ 1 }, width(1, in_width), height(1, in_height), active_window{ -1 },
+		file_dir{ nullptr }
 	{
 		// Set default font
 		LOGFONT lf;
@@ -909,6 +1002,8 @@ namespace cpplot {
 			}
 
 			loc_active_window = x_dim * position[0] + position[1];
+
+			active_window = loc_active_window;
 		}
 
 		// If the number of plot calls is larger than number of graphs
@@ -921,7 +1016,7 @@ namespace cpplot {
 		// Send the variables to the selected Window
 		windows[loc_active_window].prepare(y, type, width, color);
 	}
-
+	
 	inline void Figure::paint(HDC hdc, HWND hwnd, RECT client_area)
 	{
 		// Select default font
@@ -973,10 +1068,10 @@ namespace cpplot {
 			}
 
 			// Generate graphs from individual windows
-			windows[i].show(hdc, hwnd, rect);
+			windows[i].show(hdc, hwnd, rect, font);
 		}
 	};
-
+	
 	void Figure::set_font(int nHeight, int nWidth, int nEscapement, int nOrientation, 
 		int fnWeight, DWORD fdwItalic, DWORD fdwUnderline, DWORD fdwStrikeOut, DWORD 
 		fdwCharSet, DWORD fdwOututPrecision, DWORD fdwClipPrecision, DWORD fdwQuality, 
@@ -987,6 +1082,55 @@ namespace cpplot {
 			fdwUnderline, fdwStrikeOut, fdwCharSet, fdwOututPrecision, fdwClipPrecision, 
 			fdwQuality, fdwPitchAndFamily, lpszFace);
 	}
+
+	void Figure::xlabel(std::string lab)
+	{
+		windows[active_window].set_xlabel(lab);
+	}
+
+	void Figure::ylabel(std::string lab)
+	{
+		windows[active_window].set_ylabel(lab);
+	}
+
+	void Figure::save(std::string file)
+	{
+		// Set the suffix type of saved image
+		wchar_t file_type[] = L".bmp\0";
+		
+		// Allocate enough space to hold also the suffix of type
+		file_dir = new wchar_t[file.size() + sizeof(file_type) / sizeof(wchar_t)]; 
+
+		// Copy the original string to the file_dir buffer
+		MultiByteToWideChar(CP_UTF8, 0, file.c_str(), -1, file_dir, file.size());
+
+		// Copy the suffix type to the buffer
+		wcscpy_s(file_dir + file.size(), sizeof(file_type) / sizeof(wchar_t), file_type);
+
+		// Set the cpplot::Globals::dir, so the CALLBACK function can see it
+		cpplot::Globals::dir = file_dir;
+
+		// Finally, show the window with the plot
+		this->show();
+	}
+
+	Figure::~Figure()
+	{
+		// Deallocate the storage of inidividual objects allocated with placement new
+		for (unsigned int i = 0; i != (y_dim * x_dim); ++i)
+		{
+			windows[i].~Window();
+		};
+
+		// Free the buffer allocated by allocate
+		alloc.deallocate(windows, x_dim * y_dim);
+
+		// Delete file_dir, if allocated
+		if (file_dir)
+		{
+			delete[] file_dir;
+		}
+	};
 
 	inline unsigned int cumulative_sum(const std::vector<unsigned int>& container, size_t index)
 	{
@@ -1007,6 +1151,9 @@ namespace cpplot {
 // Callback function
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+	// Variable for the readiness of the window
+	static bool window_ready = false;
+
 	switch (msg)
 	{
 
@@ -1016,17 +1163,33 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 		RECT client_area;
 		GetClientRect(hwnd, &client_area);
-
+		
 		HDC hdc = BeginPaint(hwnd, &ps);
 		cpplot::Globals::figure->paint(hdc, hwnd, client_area);
+
+		// Save the image and destroy window
+		if (window_ready && cpplot::Globals::dir)
+		{
+			CreateImage(hwnd, hdc, cpplot::Globals::dir);
+			cpplot::Globals::dir = nullptr;
+			DestroyWindow(hwnd);
+		}
+		
 		EndPaint(hwnd, &ps);
 	}
 	break;
-
+	
+	case WM_SHOWWINDOW:
+	{
+		window_ready = true;
+	}
+	break;
+	
 	case WM_WINDOWPOSCHANGED:
 	{
 		SendMessage(hwnd, WM_PAINT, NULL, NULL);
 	}
+	break;
 
 	case WM_KEYDOWN:
 	{
@@ -1050,7 +1213,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	break;
 
 	default:
+	{
 		return DefWindowProc(hwnd, msg, wParam, lParam);
+	}
 	}
 
 	return 0;
@@ -1074,7 +1239,7 @@ int InitializeWindow(int width, int height)
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 	wc.lpszMenuName = NULL;
-	swprintf_s(cpplot::Globals::FigureName, cpplot::Globals::size, L"%d", 
+	swprintf_s(cpplot::Globals::FigureName, cpplot::Globals::size, L"%d\0", 
 		cpplot::Globals::counter++);
 	wc.lpszClassName = cpplot::Globals::FigureName;
 	wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
@@ -1124,8 +1289,3 @@ int InitializeWindow(int width, int height)
 
 	return 0;
 }
-
-
-
-
-

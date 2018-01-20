@@ -2,7 +2,33 @@
 #include <windows.h>
 #include "Header.h"
 
-// Source https://msdn.microsoft.com/en-us/library/windows/desktop/dd145119(v=vs.85).aspx
+PBITMAPINFO CreateBitmapInfoStruct(HWND hwnd, HBITMAP hBmp);
+void CreateBMPFile(HWND hwnd, LPTSTR pszFile, PBITMAPINFO pbi,
+	HBITMAP hBMP, HDC hDC);
+
+void CreateImage(HWND hwnd, HDC hdc, wchar_t *dir)
+{
+	HDC memDC = CreateCompatibleDC(hdc);
+
+	RECT rcClient;
+	GetClientRect(hwnd, &rcClient);
+
+	int nWidth = rcClient.right - rcClient.left;
+	int nHeight = rcClient.bottom - rcClient.top;
+
+	HBITMAP bmp = CreateCompatibleBitmap(hdc, nWidth, nHeight);
+	SelectObject(memDC, bmp);
+	BitBlt(memDC, 0, 0, nWidth, nHeight, hdc, 0, 0, SRCCOPY);
+	PBITMAPINFO pbi = CreateBitmapInfoStruct(hwnd, bmp);
+
+	CreateBMPFile(hwnd, dir, pbi, bmp, hdc);
+
+	DeleteObject(bmp);
+	DeleteDC(memDC);
+}
+
+// Source for the following two function:
+// https://msdn.microsoft.com/en-us/library/windows/desktop/dd145119(v=vs.85).aspx
 
 PBITMAPINFO CreateBitmapInfoStruct(HWND hwnd, HBITMAP hBmp)
 {
@@ -98,7 +124,7 @@ void CreateBMPFile(HWND hwnd, LPTSTR pszFile, PBITMAPINFO pbi,
 	if (!GetDIBits(hDC, hBMP, 0, (WORD)pbih->biHeight, lpBits, pbi, DIB_RGB_COLORS))
 	{
 		printf("Device-independent bitmap could not be created!");
-		return; 
+		return;
 	}
 
 	// Create the .BMP file.  
@@ -116,8 +142,8 @@ void CreateBMPFile(HWND hwnd, LPTSTR pszFile, PBITMAPINFO pbi,
 	}
 
 	hdr.bfType = 0x4d42; // 0x42 = "B" 0x4d = "M"  
-	
-	// Compute the size of the entire file.  
+
+						 // Compute the size of the entire file.  
 	hdr.bfSize = (DWORD)(sizeof(BITMAPFILEHEADER) +
 		pbih->biSize + pbih->biClrUsed
 		* sizeof(RGBQUAD) + pbih->biSizeImage);
@@ -152,7 +178,7 @@ void CreateBMPFile(HWND hwnd, LPTSTR pszFile, PBITMAPINFO pbi,
 	if (!WriteFile(hf, (LPSTR)hp, (int)cb, (LPDWORD)&dwTmp, NULL))
 	{
 		printf("Unable to write to the specified file!");
-		return; 
+		return;
 	};
 
 	// Close the .BMP file.  

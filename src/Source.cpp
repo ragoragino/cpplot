@@ -1,18 +1,20 @@
-// #include "example.h"
 #include "Figure.h"
 
 int main()
 {
-	// InitializeWindow();
 	/*
 	std::vector<double> y = { 1.0,2.0,3.0 };
 	cpplot::Figure plt(1000, 1000, RGB(100, 0, 200));
 	plt.plot(y, "line", 1.0, PINK, std::vector<unsigned int>{});
 	plt.show();
 	*/
-
-	cpplot::Figure plt(std::vector<unsigned int> { 800 }, std::vector<unsigned int> { 400, 400 }, std::vector<COLORREF>{LIGHT_GREY, LIGHT_GREY});
-
+	
+	cpplot::Figure plt(
+		std::vector<unsigned int> { 800 }, 
+		std::vector<unsigned int> { 400, 400 }, 
+		std::vector<COLORREF>{LIGHT_GREY, LIGHT_GREY}
+	);
+	
 	unsigned int length = 100;
 	std::vector<double> y(length);
 	std::vector<double> z(length);
@@ -24,17 +26,13 @@ int main()
 	
 	for (unsigned int i = 0; i != 2; ++i)
 	{
-		plt.plot(y, "line", 1, BLUE, { i, 0 });
-		plt.plot(z, "line", 1, RED, { i, 0 });
-		
-		/*
-		plt.legend(" ");
-		plt.title(" ");
-		plt.xlabel(" ");
-		plt.ylabel(" ");
-		*/
+		plt.plot(y, "scatter", 3, BLUE, { i, 0 });
+		plt.plot(z, "scatter", 3, RED, { i, 0 });
+		plt.xlabel("Time");
+		plt.ylabel("Price");
 	}
-	plt.set_font();
+	// plt.set_font();
+	// plt.save("PLOT");
 	plt.show();
 	
 	return 0;

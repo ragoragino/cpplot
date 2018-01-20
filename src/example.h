@@ -125,24 +125,3 @@ int InitializeWindow()
 
 	return 0;
 }
-
-void CreateImage(HWND hwnd, HDC hdc)
-{
-	HDC memDC = CreateCompatibleDC(hdc);
-
-	RECT rcClient;
-	GetClientRect(hwnd, &rcClient);
-
-	int nWidth = rcClient.right - rcClient.left;
-	int nHeight = rcClient.bottom - rcClient.top;
-
-	HBITMAP bmp = CreateCompatibleBitmap(hdc, nWidth, nHeight);
-	SelectObject(memDC, bmp);
-	BitBlt(memDC, 0, 0, nWidth, nHeight, hdc, 0, 0, SRCCOPY);
-	PBITMAPINFO pbi = CreateBitmapInfoStruct(hwnd, bmp);
-
-	CreateBMPFile(hwnd, L"file.bmp", pbi, bmp, hdc);
-
-	DeleteObject(bmp);
-	DeleteDC(memDC);
-}
