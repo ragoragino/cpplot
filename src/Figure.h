@@ -31,7 +31,7 @@ TODO:
 #define WHITE RGB(255, 255, 255)
 
 // VARIABLES
-// defines number of graphs handled in a single window
+// defines number of Graph objects handled in a single window
 #ifndef MAX_GRAPHS
 #define MAX_GRAPHS 10
 #endif
@@ -41,7 +41,7 @@ TODO:
 #define ADJUSTMENT_GRAPH 0.05
 #endif
 
-// define space between the window and graph = usable rectangle
+// define space between the Figure and Window = usable rectangle
 #ifndef ADJUSTMENT_WINDOW
 #define ADJUSTMENT_WINDOW 10
 #endif
@@ -51,9 +51,44 @@ TODO:
 #define ATTRIBUTE_DISTANCE 0.12
 #endif
 
-// define ratio of tick stick w.r.t. the abslute attribute distance
-#ifndef TICK_RATIO
-#define TICK_RATIO 0.2
+// define ratio of x axis tick area w.r.t. font size
+#ifndef X_TICK_RATIO
+#define X_TICK_RATIO (4.0 / 1.5)
+#endif
+
+// define ratio of y axis tick area w.r.t. font size
+#ifndef Y_TICK_RATIO
+#define Y_TICK_RATIO (4.0 / 1.5)
+#endif
+
+// define ratio of text height to title area
+#ifndef TITLE_RATIO
+#define TITLE_RATIO (3.0 / 2.0)
+#endif
+
+// absolute length of the symbol area (i.e. point, line) in the legend box
+#ifndef LEGEND_SYMBOL_LENGTH
+#define LEGEND_SYMBOL_LENGTH 15
+#endif
+
+// ratio of the legend area to the whole unadjusted graph area
+#ifndef MAX_LEGEND_RATIO
+#define MAX_LEGEND_RATIO 0.2
+#endif
+
+// free space between graph and legend
+#ifndef GRAP_LEGEND_SPACE
+#define GRAPH_LEGEND_SPACE 10
+#endif
+
+// Space between individual successive points in the legend
+#ifndef LEGEND_TEXT_POINT_SPACE
+#define LEGEND_TEXT_POINT_SPACE 10
+#endif
+
+// Space between individual individual rows in the legend
+#ifndef LEGEND_TEXT_ROW_SPACE
+#define LEGEND_TEXT_ROW_SPACE 5
 #endif
 
 int InitializeWindow(int width, int height);
@@ -62,26 +97,38 @@ namespace cpplot {
 
 	// Necessary declarations
 	class Figure;
-	inline unsigned int cumulative_sum(const std::vector<unsigned int>& container, size_t index);
+	inline unsigned int cumulative_sum(const std::vector<unsigned int>& 
+		container, size_t index);
 
 	// Global variables
 	namespace Globals
 	{
+		// Maximum length of the ID (as wchar) of the Figure
 		static constexpr unsigned int size = 10;
+		
+		// Buffer holding ID of the Figure
 		static wchar_t FigureName[size];
-		static unsigned int counter = 0;
+		
+		// ID of the current Figure
+		static unsigned int id = 0;
+
+		// Pointer to current Figure object
 		static cpplot::Figure *figure = nullptr;
+
+		// Pointer to directory for saving the image
 		static wchar_t *dir = nullptr;
 	};
 
-	// Abstract Base Class
+	// ABC
 	class Graph
 	{
 	public:
-		virtual void prepare(const std::vector<double>& in_x, const std::vector<double>& in_y, 
-			unsigned int in_size, COLORREF in_color, std::vector<double>& range) = 0;
+		virtual void prepare(const std::vector<double>& in_x, 
+			const std::vector<double>& in_y, unsigned int in_size, 
+			COLORREF in_color, std::vector<double>& range) = 0;
 
-		virtual void show(HDC hdc, HWND hwnd, RECT rect, const std::vector<double>& range) const = 0;
+		virtual void show(HDC hdc, HWND hwnd, RECT rect, 
+			const std::vector<double>& range) const = 0;
 
 		virtual ~Graph() = default;
 
@@ -96,10 +143,12 @@ namespace cpplot {
 	public:
 		Scatter() = default;
 
-		virtual void prepare(const std::vector<double>& in_x, const std::vector<double>& in_y, 
-			unsigned int in_size, COLORREF in_color, std::vector<double>& range);
+		virtual void prepare(const std::vector<double>& in_x, 
+			const std::vector<double>& in_y, unsigned int in_size, 
+			COLORREF in_color, std::vector<double>& range);
 
-		virtual void show(HDC hdc, HWND hwnd, RECT rect, const std::vector<double>& range) const;
+		virtual void show(HDC hdc, HWND hwnd, RECT rect, 
+			const std::vector<double>& range) const;
 
 		virtual ~Scatter() = default;
 
@@ -107,8 +156,9 @@ namespace cpplot {
 		std::vector<double> x, y;
 	};
 
-	void Scatter::prepare(const std::vector<double>& in_x, const std::vector<double>& in_y, 
-		unsigned int in_size, COLORREF in_color, std::vector<double>& range)
+	void Scatter::prepare(const std::vector<double>& in_x, 
+		const std::vector<double>& in_y, unsigned int in_size, 
+		COLORREF in_color, std::vector<double>& range)
 	{
 		x = in_x;
 		y = in_y;
@@ -121,17 +171,18 @@ namespace cpplot {
 		double max_y = *std::max_element(y.begin(), y.end());
 		double min_y = *std::min_element(y.begin(), y.end());
 
-		// Set x and y range for Window data member range
+		// Set x and y range for Window member range
 		range[0] = range[0] < min_x ? range[0] : min_x;
 		range[1] = range[1] > max_x ? range[1] : max_x;
 		range[2] = range[2] < min_y ? range[2] : min_y;
 		range[3] = range[3] > max_y ? range[3] : max_y;
 	}
 
-	void Scatter::show(HDC hdc, HWND hwnd, RECT rect, const std::vector<double>& range) const
+	void Scatter::show(HDC hdc, HWND hwnd, RECT rect, 
+		const std::vector<double>& range) const
 	{
-		// Set the adjusted min and max values, adjusted for the free space before/after 
-		// first/last point
+		// Set the adjusted min and max values, adjusted for the 
+		// free space before/after first/last point
 		double adj_min_x = range[0];
 		double adj_max_x = range[1];
 		double adj_min_y = range[2];
@@ -144,13 +195,13 @@ namespace cpplot {
 		double length_y = adj_max_y - adj_min_y;
 		unsigned int x_coord, y_coord;
 
-		// Set appropriate graph properties and coordinates
+		// Set appropriate graph properties
 		HPEN hGraphPen = CreatePen(PS_SOLID, size, color);
 		HBRUSH hGraphBrush = CreateSolidBrush(color);
-		SelectObject(hdc, hGraphPen);
-		SelectObject(hdc, hGraphBrush);
+		HPEN hGraphPreviousPen = (HPEN)SelectObject(hdc, hGraphPen);
+		HBRUSH hGraphPreviousBrush = (HBRUSH)SelectObject(hdc, hGraphBrush);
 
-		// Draw the circles
+		// Draw the points
 		unsigned int x_size = x.size();
 		for (unsigned int i = 0; i != x_size; ++i)
 		{
@@ -165,6 +216,10 @@ namespace cpplot {
 		// Clean the graphic objects
 		DeleteObject(hGraphPen);
 		DeleteObject(hGraphBrush);
+
+		// Set the previous graphic properties
+		SelectObject(hdc, hGraphPreviousPen);
+		SelectObject(hdc, hGraphPreviousBrush);
 	}
 
 	// Derived class for line plots
@@ -173,10 +228,12 @@ namespace cpplot {
 	public:
 		Line() = default;
 
-		virtual void prepare(const std::vector<double>& in_x, const std::vector<double>& in_y, 
-			unsigned int in_size, COLORREF in_color, std::vector<double>& range);
+		virtual void prepare(const std::vector<double>& in_x, 
+			const std::vector<double>& in_y, unsigned int in_size,
+			COLORREF in_color, std::vector<double>& range);
 
-		virtual void show(HDC hdc, HWND hwnd, RECT rect, const std::vector<double>& range) const;
+		virtual void show(HDC hdc, HWND hwnd, RECT rect, 
+			const std::vector<double>& range) const;
 
 		virtual ~Line() = default;
 
@@ -184,12 +241,13 @@ namespace cpplot {
 		std::map<double, double> data;
 	};
 
-	void Line::prepare(const std::vector<double>& in_x, const std::vector<double>& in_y, 
-		unsigned int in_size, COLORREF in_color, std::vector<double>& range)
+	void Line::prepare(const std::vector<double>& in_x,
+		const std::vector<double>& in_y, unsigned int in_size,
+		COLORREF in_color, std::vector<double>& range)
 	{
 		for (unsigned int i = 0; i != in_x.size(); ++i)
 		{
-			data[in_x[i]] = in_y[i]; // TODO : EMPLACE ?
+			data[in_x[i]] = in_y[i]; // TODO : OPTIMIZE
 		}
 
 		size = in_size;
@@ -205,14 +263,15 @@ namespace cpplot {
 			[](const std::pair<double, double>& a, const std::pair<double, double>&b)
 		{ return a.second < b.second;  })->second;
 
-		// Set x and y range for Window data member range
+		// Set x and y range for Window member range
 		range[0] = range[0] < min_x ? range[0] : min_x;
 		range[1] = range[1] > max_x ? range[1] : max_x;
 		range[2] = range[2] < min_y ? range[2] : min_y;
 		range[3] = range[3] > max_y ? range[3] : max_y;
 	}
 
-	void Line::show(HDC hdc, HWND hwnd, RECT rect, const std::vector<double>& range) const
+	void Line::show(HDC hdc, HWND hwnd, RECT rect, 
+		const std::vector<double>& range) const
 	{
 		double adj_min_x = range[0];
 		double adj_max_x = range[1];
@@ -234,7 +293,7 @@ namespace cpplot {
 
 		// Set appropriate graph coordinates and draw the lines
 		HPEN hGraphPen = CreatePen(PS_SOLID, size, color);
-		SelectObject(hdc, hGraphPen);
+		HPEN hGraphPreviousPen = (HPEN)SelectObject(hdc, hGraphPen);
 		for (std::map<double, double>::const_iterator it = data.begin(); it != data.end(); ++it)
 		{
 			x_coord = rect.left + 
@@ -247,45 +306,104 @@ namespace cpplot {
 
 		// Delete graphics objects
 		DeleteObject(hGraphPen);
+
+		// Set the previous graphic properties
+		SelectObject(hdc, hGraphPreviousPen);
 	}
 
 	
 	class Axis
 	{
 	public:
-		void show(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect, 
+		Axis() : legend_state{ false } {};
+
+		void show_ticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect, 
 			const std::vector<double>& range, HFONT font) const;
 
-		bool get_xlabel() 
-		{
-			if (!xlabel.empty())
-			{
-				return true;
-			}
+		void show_title(HDC hdc, HWND hwnd, RECT rect, HFONT font) const;
+		
+		void show_xlabel(HDC hdc, HWND hwnd, RECT rect, HFONT font) const;
 
-			return false;
+		void show_ylabel(HDC hdc, HWND hwnd, RECT rect, HFONT font) const;
+
+		void show_legend(HDC hdc, HWND hwnd, RECT rect, HFONT font, 
+			unsigned int text_width, unsigned int text_height) const;
+
+		double tick_xoffset(unsigned int text_height) 
+		{
+			return text_height * X_TICK_RATIO;
 		}
 
-		bool get_ylabel()
+		double label_xoffset(unsigned int text_height)
 		{
-			if (!ylabel.empty())
-			{
-				return true;
-			}
+			if (xlabel.empty()) { return 0.0; }
 
-			return false;
+			return text_height;
 		}
+
+		double tick_yoffset(unsigned int text_height)
+		{
+			return text_height * Y_TICK_RATIO;
+		}
+
+		double label_yoffset(unsigned int text_height)
+		{
+			if (ylabel.empty()) { return 0.0; }
+
+			return text_height;
+		}
+
+		double title_offset(unsigned int text_height) 
+		{
+			if (title.empty()) { return 0.0; }
+			
+			return text_height * TITLE_RATIO;
+		}
+
+		double legend_offset(HDC hdc, unsigned int text_width, unsigned int base);
+
+		double legend_offset() { return 0.0; }
 
 		void set_xlabel(std::string xlab) {	xlabel = xlab; }
 
 		void set_ylabel(std::string ylab) {	ylabel = ylab; }
 
+		void set_title(std::string in_title) { title = in_title; }
+
+		void set_legend(std::string name, std::string type, COLORREF color, 
+			unsigned int size) 
+		{ 	
+			legend.emplace_back(name, type, color, size);
+		}
+
+		void activate_legend() { legend_state = true; }
+
+		bool is_legend_activated() { return legend_state; }
+
 	private:
+		struct LEGEND
+		{
+			LEGEND() = default;
+
+			LEGEND(std::string in_name, std::string in_type, COLORREF in_color,
+				unsigned int in_size) : name{ in_name }, type{ in_type }, 
+				color{ in_color }, size{ in_size } {};
+
+			std::string name;
+			std::string type;
+			COLORREF color;
+			unsigned int size;
+		};
+
 		std::string xlabel;
 		std::string ylabel;
+		std::string title;
+		std::vector<LEGEND> legend;
+
+		bool legend_state;
 	};
 
-	void Axis::show(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect, 
+	void Axis::show_ticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
 		const std::vector<double>& range, HFONT font) const
 	{
 		// Set default text alignment
@@ -433,15 +551,6 @@ namespace cpplot {
 			}
 		}
 
-		// Write the label of x axis
-		unsigned int x_coord_xlabel = (x_rect.right + x_rect.left) / 2;
-		unsigned int y_coord_xlabel = x_rect.top + 3 * x_stick + textMetric.tmHeight;
-		wchar_t * wide_xlabel = new wchar_t[xlabel.size() + 1];
-		MultiByteToWideChar(CP_UTF8, 0, xlabel.c_str(), -1, wide_xlabel, xlabel.size() + 1);
-		TextOut(hdc, x_coord_xlabel, y_coord_xlabel, wide_xlabel, xlabel.size());
-		
-		delete[] wide_xlabel;
-
 		/* *********************************
 		// Y axis ticks and values rendering
 		********************************* */
@@ -579,21 +688,220 @@ namespace cpplot {
 			}
 		}
 
-		// Write the label of y axis
-		unsigned int x_coord_ylabel = y_rect.right - 3 * y_stick - textMetric.tmHeight;
-		unsigned int y_coord_ylabel = (y_rect.bottom + y_rect.top) / 2;
-		wchar_t * wide_ylabel = new wchar_t[ylabel.size() + 1];
-		MultiByteToWideChar(CP_UTF8, 0, ylabel.c_str(), -1, wide_ylabel, ylabel.size() + 1);
-		TextOut(hdc, x_coord_ylabel, y_coord_ylabel, wide_ylabel, ylabel.size());
-
-		delete[] wide_ylabel;
-
 		// Set text alignment and font that was in place before rendering axis attributes
 		SetTextAlign(hdc, prev_text_align);
 		SelectObject(hdc, h_prev_font);
 
 		// Set previous graphics properties and delete graphic objects
 		DeleteObject(hBoxPen);
+	}
+
+	void Axis::show_xlabel(HDC hdc, HWND hwnd, RECT rect, HFONT font) const
+	{
+		// Set bottom and center text alignment
+		unsigned int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_BOTTOM);
+
+		// Set pen attribute
+		HPEN hBoxPen = CreatePen(PS_SOLID, 1, BLACK);
+		SelectObject(hdc, hBoxPen);
+
+		// Write the label of x axis
+		unsigned int x_coord_xlabel = (unsigned int)((rect.right + rect.left) * 0.5);
+		unsigned int y_coord_xlabel = rect.bottom;
+		wchar_t * wide_xlabel = new wchar_t[xlabel.size() + 1];
+		MultiByteToWideChar(CP_UTF8, 0, xlabel.c_str(), -1, wide_xlabel, xlabel.size() + 1);
+		TextOut(hdc, x_coord_xlabel, y_coord_xlabel, wide_xlabel, xlabel.size());
+
+		delete[] wide_xlabel;
+
+		// Set previous graphic properties
+		SetTextAlign(hdc, prev_text_align);
+		DeleteObject(hBoxPen);
+	}
+
+	void Axis::show_ylabel(HDC hdc, HWND hwnd, RECT rect, HFONT font) const
+	{
+		// Set bottom and center text alignment
+		unsigned int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_TOP);
+
+		// Set font rotated by 90 degrees
+		LOGFONT lf;
+		GetObject(font, sizeof(LOGFONT), &lf);
+		lf.lfEscapement = 900;
+		HFONT lfont = CreateFontIndirect(&lf);
+		HFONT h_prev_font = (HFONT)SelectObject(hdc, (HGDIOBJ)(HFONT)(lfont));
+
+		// Set pen attribute
+		HPEN hBoxPen = CreatePen(PS_SOLID, 1, BLACK);
+		SelectObject(hdc, hBoxPen);
+
+		// Write the label of y axis
+		unsigned int x_coord_ylabel = rect.left;
+		unsigned int y_coord_ylabel = (unsigned int)((rect.top + rect.bottom) * 0.5);
+		wchar_t * wide_ylabel = new wchar_t[ylabel.size() + 1];
+		MultiByteToWideChar(CP_UTF8, 0, ylabel.c_str(), -1, wide_ylabel, ylabel.size() + 1);
+		TextOut(hdc, x_coord_ylabel, y_coord_ylabel, wide_ylabel, ylabel.size());
+
+		delete[] wide_ylabel;
+
+		// Set previous graphic properties
+		SetTextAlign(hdc, prev_text_align);
+		SelectObject(hdc, h_prev_font);
+		DeleteObject(hBoxPen);
+	}
+
+	void Axis::show_title(HDC hdc, HWND hwnd, RECT rect, HFONT font) const
+	{
+		// Set default text alignment
+		unsigned int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_TOP);
+
+		// Make the font bold
+		LOGFONT lf;
+		GetObject(font, sizeof(LOGFONT), &lf);
+		lf.lfWeight = FW_BOLD;
+		HFONT lfont = CreateFontIndirect(&lf);
+		HFONT h_prev_font = (HFONT)SelectObject(hdc, (HGDIOBJ)(HFONT)(lfont));
+
+		// Write the title
+		unsigned int x_coord_title = (unsigned int) ((rect.right + rect.left) / 2);
+		unsigned int y_coord_title = rect.top;
+		wchar_t * wide_title = new wchar_t[title.size() + 1];
+		MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wide_title, ylabel.size() + 1);
+		TextOut(hdc, x_coord_title, y_coord_title, wide_title, title.size());
+
+		delete[] wide_title;
+
+		// Set previous graphic properties
+		SetTextAlign(hdc, prev_text_align);
+		SelectObject(hdc, h_prev_font);
+	}
+
+	inline void Axis::show_legend(HDC hdc, HWND hwnd, RECT rect, HFONT font, 
+		unsigned int text_width, unsigned int text_height) const
+	{
+		// Set default text alignment
+		unsigned int prev_text_align = SetTextAlign(hdc, TA_LEFT | TA_TOP);
+
+		// Get current graphic properties
+		HPEN hGraphPreviousPen = (HPEN)GetCurrentObject(hdc, OBJ_PEN);
+		HBRUSH hGraphPreviousBrush = (HBRUSH)GetCurrentObject(hdc, OBJ_BRUSH);
+		HPEN hGraphPen;
+		HBRUSH hGraphBrush;
+
+		// Position of points/centre of lines for symbols of the legend
+		unsigned int point_pos_x, point_pos_y;
+
+		// Length of the space for writing the names of the legend
+		unsigned int legend_text_width = rect.right - rect.left -
+			LEGEND_SYMBOL_LENGTH;
+
+		// Maximum amount of symbols that can be written in the legend space
+		unsigned int max_symbols = legend_text_width / text_width;
+
+		// Buffer to hold current output text
+		wchar_t *buffer = new wchar_t[max_symbols];
+
+		// Length of unwritten string, length of whole string and beginning
+		// and end of the current state of writing
+		unsigned int diff, string_size, begin, end;
+
+		// Offset of the y axis from the top of the rectangle
+		unsigned int current_offset = LEGEND_SYMBOL_LENGTH;
+		
+		for (std::vector<LEGEND>::const_iterator
+			it = legend.begin(); it != legend.end(); ++it)
+		{
+			// Set proper graphics attributes
+			hGraphPen = CreatePen(PS_SOLID, it->size, it->color);
+			hGraphBrush = CreateSolidBrush(it->color);
+			(HPEN)SelectObject(hdc, hGraphPen);
+			(HBRUSH)SelectObject(hdc, hGraphBrush);
+
+			// Paint the point/line in the left column of the legend
+			point_pos_x = (unsigned int)((rect.left + LEGEND_SYMBOL_LENGTH * 0.5));
+			point_pos_y = (unsigned int)(rect.top + text_height * 0.5 
+				+ current_offset);
+			if (it->type == "scatter")
+			{
+				Ellipse(hdc, point_pos_x - 1, point_pos_y - 1, point_pos_x + 1,
+					point_pos_y + 1);
+			}
+			else
+			{
+				unsigned int begin_x = (unsigned int)((rect.left + 
+					LEGEND_SYMBOL_LENGTH * 0.25));
+				unsigned int end_x = (unsigned int)((rect.left + 
+					LEGEND_SYMBOL_LENGTH * 0.75));
+				MoveToEx(hdc, begin_x, point_pos_y, NULL);
+				LineTo(hdc, end_x, point_pos_y);
+			}
+
+			// Show the text associated with a given point/line
+			string_size = (it->name).size();
+			diff = string_size;
+			begin = 0;
+
+			while (true)
+			{
+				// If the rest of the string is smaller than the possible output length
+				if (diff <= max_symbols)
+				{
+					end = string_size;
+
+					MultiByteToWideChar(CP_UTF8, 0, &((it->name).c_str())[begin], 
+						end - begin, buffer, diff);
+					TextOut(hdc, rect.left + LEGEND_SYMBOL_LENGTH, rect.top
+						+ current_offset, buffer, end - begin);
+					break;
+				}
+				else
+				{
+					end = begin + max_symbols - 1;
+
+					MultiByteToWideChar(CP_UTF8, 0, &(it->name).c_str()[begin], 
+						end - begin, buffer, diff);
+					wcsncpy_s(&buffer[max_symbols - 1], 1, L"-", 1);
+					TextOut(hdc, rect.left + LEGEND_SYMBOL_LENGTH, point_pos_y +
+						current_offset, buffer, max_symbols);
+
+					begin = end;
+					diff = string_size - begin;
+
+					current_offset += text_height + LEGEND_TEXT_ROW_SPACE;
+				}
+			}
+
+			current_offset += text_height + LEGEND_TEXT_POINT_SPACE;
+		}
+
+		// Set the previous graphics properties
+		SelectObject(hdc, (HGDIOBJ)(HPEN)hGraphPreviousPen);
+		SelectObject(hdc, (HGDIOBJ)(HBRUSH)hGraphPreviousBrush);
+		SetTextAlign(hdc, prev_text_align);
+		
+		delete[] buffer;
+	}
+
+	double Axis::legend_offset(HDC hdc, unsigned int text_width, unsigned int base)
+	{
+		// width of the rectangle available for text of the legend
+		unsigned int base_width = base - LEGEND_SYMBOL_LENGTH;
+
+		unsigned int max_width = 0;
+		unsigned int string_width = 0;
+		for (std::vector<LEGEND>::const_iterator
+			it = legend.begin(); it != legend.end(); ++it)
+		{
+			string_width = (it->name).size() * text_width;
+			if (string_width >= base_width)
+			{
+				return base_width;
+			};
+
+			max_width = (string_width > max_width) ? string_width : max_width;
+		}
+
+		return max_width + LEGEND_SYMBOL_LENGTH;
 	}
 
 	// Window class
@@ -625,6 +933,13 @@ namespace cpplot {
 		void set_xlabel(std::string xlab);
 
 		void set_ylabel(std::string ylab);
+
+		void set_title(std::string ylab);
+
+		void set_legend(std::string name, std::string type,
+			COLORREF color, unsigned int size);
+
+		void activate_legend();
 
 		~Window();
 
@@ -669,41 +984,79 @@ namespace cpplot {
 			rect.bottom - ADJUSTMENT_WINDOW 
 		};
 
-		// Get parameters of current font and get the offset of 
+		// Get parameters of current font
 		TEXTMETRIC textMetric;
 		GetTextMetrics(hdc, &textMetric);
 
-		// TODO : PARAMETERS AS COMPILER CONSTANTS
-		double ratio = 1.5 / 5.0;
-		double x_offset = textMetric.tmHeight * 
-			(axis->get_xlabel() ? 5 : (4 / 1.5));
-		double y_offset = textMetric.tmHeight * 
-			(axis->get_ylabel() ? 5 : (4 / 1.5));
-		
+		// Find which attributes the graph should have
+		double x_tick_offset = axis->tick_xoffset(textMetric.tmHeight);
+		double y_tick_offset = axis->tick_yoffset(textMetric.tmHeight);
+		double x_label_offset = axis->label_xoffset(textMetric.tmHeight);
+		double y_label_offset = axis->label_yoffset(textMetric.tmHeight);
+		double title_offset = axis->title_offset(textMetric.tmHeight);
+		double legend_offset = 0.0;
+
+		// Find legend offset if the user wants the legend
+		if (axis->is_legend_activated())
+		{
+			// Maximum legend area
+			unsigned int legend_rect = (unsigned int)((graph_rect.right -
+				graph_rect.left) * MAX_LEGEND_RATIO - GRAPH_LEGEND_SPACE);
+
+			legend_offset = axis->legend_offset(hdc, textMetric.tmAveCharWidth, legend_rect);
+		}
+
+		// TODO : Delete -> for visual purposes
 		HPEN hBoxPen = CreatePen(PS_SOLID, 1, BLACK);
 		HGDIOBJ prev_hBoxPen = SelectObject(hdc, hBoxPen);
-		// Rectangle(hdc, graph_rect.left, graph_rect.top, graph_rect.right, graph_rect.bottom);
+		Rectangle(hdc, graph_rect.left, graph_rect.top, graph_rect.right, graph_rect.bottom);
 
-		// Set rectangle for axis and values on axis
-		RECT x_ticks, y_ticks;
+		// Prepare rectangle for axis and labels
+		RECT x_ticks, y_ticks, x_label, y_label;
 
-		x_ticks.bottom = graph_rect.bottom;
-		x_ticks.top = (unsigned int)(x_ticks.bottom - x_offset);
+		// Set x and y label rectangles
+		x_label.bottom = graph_rect.bottom;
+		x_label.top = (unsigned int)(x_label.bottom - x_label_offset);
 
-		y_ticks.left = graph_rect.left;
-		y_ticks.right = (unsigned int)(y_ticks.left + y_offset);
+		y_label.left = graph_rect.left;
+		y_label.right = (unsigned int)(y_label.left + y_label_offset);
+
+		// Set x and y tick rectangles
+		x_ticks.bottom = x_label.top;
+		x_ticks.top = (unsigned int)(x_ticks.bottom - x_tick_offset);
+
+		y_ticks.left = y_label.right;
+		y_ticks.right = (unsigned int)(y_ticks.left + y_tick_offset);
+
+		// Create rectangle for legend
+		RECT legend = graph_rect;
+		legend.right -= GRAPH_LEGEND_SPACE; // move also the right side of the legend
+		legend.left = legend.right - (unsigned int)legend_offset;
+
+		// Create the title rectangle and adjust the graph rectangle accordingly
+		RECT title_rect = graph_rect;
+		title_rect.bottom = (unsigned int)(title_rect.top + title_offset);
 
 		// Adjust the graph rectangle
 		graph_rect.bottom = x_ticks.top;
 		graph_rect.left = y_ticks.right;
-
-		// Adjust the x and y tick rectangles
-		x_ticks.right = graph_rect.right;
+		graph_rect.right = legend.left - GRAPH_LEGEND_SPACE;
+		graph_rect.top = title_rect.bottom;
+	
+		// Adjust x_ticks, y_ticks, x_label, and y_label to fit the 
+		// title-adjusted graph rectangle, i.e. those sides which are 
+		// not affected by that attribute
 		x_ticks.left = graph_rect.left;
-
+		x_ticks.right = graph_rect.right;
 		y_ticks.top = graph_rect.top;
 		y_ticks.bottom = graph_rect.bottom;
-		
+		x_label.left = graph_rect.left;
+		x_label.right = graph_rect.right;
+		y_label.top = graph_rect.top;
+		y_label.bottom = graph_rect.bottom;
+		legend.top = graph_rect.top;
+		legend.bottom = graph_rect.bottom;
+				
 		// Draw and fill the enclosing rectangle
 		hBoxPen = CreatePen(PS_SOLID, 1, BLACK);
 		HBRUSH hGraphBrush = CreateSolidBrush(background_color);
@@ -711,20 +1064,33 @@ namespace cpplot {
 		HGDIOBJ prev_hGraphBrush = SelectObject(hdc, hGraphBrush);
 		Rectangle(hdc, graph_rect.left, graph_rect.top, graph_rect.right, graph_rect.bottom);
 
-		// Paint individual graphs
-		for (unsigned int i = 0; i != active_graph; ++i)
-		{
-			graph[i]->show(hdc, hwnd, graph_rect, xy_range);
-		}
-
 		// Set previous options and delete graphics objects
 		SelectObject(hdc, prev_hBoxPen);
 		SelectObject(hdc, prev_hGraphBrush);
 		DeleteObject(hBoxPen);
 		DeleteObject(hGraphBrush);
 
-		// Call the rendering of axis ticks and value signs
-		axis->show(hdc, hwnd, x_ticks, y_ticks, xy_range, font);
+		// Paint individual graphs
+		for (unsigned int i = 0; i != active_graph; ++i)
+		{
+			graph[i]->show(hdc, hwnd, graph_rect, xy_range);
+		}
+
+		// Call the rendering of axis ticks and labels
+		axis->show_ticks(hdc, hwnd, x_ticks, y_ticks, xy_range, font);
+		axis->show_xlabel(hdc, hwnd, x_label, font);
+		axis->show_ylabel(hdc, hwnd, y_label, font);
+
+		// Call the rendering of title
+		axis->show_title(hdc, hwnd, title_rect, font);
+
+		// Call the rendering of legend
+		if (axis->is_legend_activated())
+		{
+			axis->show_legend(hdc, hwnd, legend, font, textMetric.tmAveCharWidth,
+				textMetric.tmHeight);
+		}
+		
 	}
 
 	inline void Window::prepare(const std::vector<double>& in_x, const std::vector<double>& in_y, 
@@ -796,6 +1162,22 @@ namespace cpplot {
 		axis->set_ylabel(ylab);
 	}
 
+	inline void Window::set_title(std::string ylab)
+	{
+		axis->set_title(ylab);
+	}
+
+	inline void Window::set_legend(std::string name, std::string type, 
+		COLORREF color, unsigned int size)
+	{
+		axis->set_legend(name, type, color, size);
+	}
+
+	inline void Window::activate_legend()
+	{
+		axis->activate_legend();
+	}
+
 	inline void Window::resize() 
 	{ 
 		// Allocate new, larger, storage
@@ -853,20 +1235,26 @@ namespace cpplot {
 		~Figure();
 
 		void plot(const std::vector<double>& x, const std::vector<double>& y, 
-			std::string type = "line", unsigned int width = 1, COLORREF color = WHITE,
-			std::vector<unsigned int> position = std::vector<unsigned int>{});
-
-		void plot(const std::vector<double>& y, std::string type = "line", 
-			unsigned int width = 1, COLORREF color = WHITE, std::vector<unsigned int> position = 
+			std::string name = "", std::string type = "line", unsigned int width = 1,
+			COLORREF color = WHITE,	std::vector<unsigned int> position = 
 			std::vector<unsigned int>{});
 
-		void legend(std::string leg) {};
+		void plot(const std::vector<double>& y, std::string name = "", std::string
+			type = "line", unsigned int width = 1, COLORREF color = WHITE, 
+			std::vector<unsigned int> position = std::vector<unsigned int>{});
+
+		void fplot(double(*func)(double x), double from, double to,
+			std::string name = "", std::string type = "line", 
+			unsigned int width = 1, COLORREF color = WHITE,
+			std::vector<unsigned int> position = std::vector<unsigned int>{});
 
 		void xlabel(std::string xlab);
 
 		void ylabel(std::string ylab);
 
-		void title(std::string title) {};
+		void title(std::string title);
+
+		void legend();
 
 		void show()
 		{
@@ -885,7 +1273,7 @@ namespace cpplot {
 
 		void save(std::string file);
 
-		wchar_t *file_dir; // file directory -> public because needs to be seen by callback 
+		wchar_t *file_dir; // file directory
 
 	private:
 		unsigned int x_dim, y_dim; // dimensionality of the plotting area
@@ -970,13 +1358,15 @@ namespace cpplot {
 	}
 
 	inline void Figure::plot(const std::vector<double>& x, const std::vector<double>& y, 
-		std::string type, unsigned int width, COLORREF color, std::vector<unsigned int> position)
+		std::string name, std::string type, unsigned int width, COLORREF color, 
+		std::vector<unsigned int> position)
 	{
 		
 	}
 
-	inline void Figure::plot(const std::vector<double>& y, std::string type, unsigned int width,
-		COLORREF color, std::vector<unsigned int> position)
+	inline void Figure::plot(const std::vector<double>& y, std::string name,
+		std::string type, unsigned int width, COLORREF color, std::vector<unsigned int> 
+		position)
 	{
 		unsigned int loc_active_window;
 
@@ -1015,6 +1405,26 @@ namespace cpplot {
 
 		// Send the variables to the selected Window
 		windows[loc_active_window].prepare(y, type, width, color);
+
+		// Send the name variable for legend construction
+		windows[loc_active_window].set_legend(name, type, color, width);
+	}
+
+	void Figure::fplot(double(*func)(double x), double from, double to, 
+		std::string name, std::string type, unsigned int width, 
+		COLORREF color,	std::vector<unsigned int> position)
+	{
+		unsigned int length = 1000;
+		std::vector<double> x(length);
+		std::vector<double> y(length);
+
+		for (int i = 0; i != length; ++i)
+		{
+			x[i] = from + i * (to - from) / length;
+			y[i] = func(x[i]);
+		}
+
+		this->plot(y, name, type, width, color, position);
 	}
 	
 	inline void Figure::paint(HDC hdc, HWND hwnd, RECT client_area)
@@ -1024,11 +1434,7 @@ namespace cpplot {
 
 		// Set default text alignment 
 		SetTextAlign(hdc, TA_CENTER | TA_TOP);
-			
-		unsigned int pos_x;
-		unsigned int pos_y;
-		RECT rect;
-
+	
 		// Adjust new coordinates to the possibly resized window
 		double width_ratio = (double)(client_area.right - client_area.left) / (double)win_width;
 		double height_ratio = (double)(client_area.bottom - client_area.top) / (double)win_height;
@@ -1047,12 +1453,18 @@ namespace cpplot {
 		win_height = client_area.bottom - client_area.top;
 
 		// Plot the individual windows
+		unsigned int pos_x;
+		unsigned int pos_y;
+		RECT rect;
+
 		for (unsigned int i = 0; i != (x_dim * y_dim); ++i)
 		{
-			// Set default text alignment 
-			SetTextAlign(hdc, TA_CENTER);
+			if (!windows[i].init_test())
+			{
+				throw std::exception(); // TODO : Exception: uninitialized plot segment
+			}
 
-			// Compute the position of the window in the plot
+			// Compute the beginning position x and y of the window in the plot
 			pos_x = i / y_dim;
 			pos_y = i - pos_x * y_dim;
 
@@ -1062,38 +1474,46 @@ namespace cpplot {
 			rect.left = cumulative_sum(width, pos_x);
 			rect.right = cumulative_sum(width, pos_x + 1);
 
-			if (!windows[i].init_test())
-			{
-				throw std::exception(); // TODO : Exception: uninitialized plot segment
-			}
-
-			// Generate graphs from individual windows
+			// Generate and show contents of individual windows
 			windows[i].show(hdc, hwnd, rect, font);
 		}
 	};
 	
-	void Figure::set_font(int nHeight, int nWidth, int nEscapement, int nOrientation, 
+	inline void Figure::set_font(int nHeight, int nWidth, int nEscapement, int nOrientation, 
 		int fnWeight, DWORD fdwItalic, DWORD fdwUnderline, DWORD fdwStrikeOut, DWORD 
 		fdwCharSet, DWORD fdwOututPrecision, DWORD fdwClipPrecision, DWORD fdwQuality, 
 		DWORD fdwPitchAndFamily, LPCTSTR lpszFace)
 	{
-		// set custom font
+		// TODO : make more user-friendly
 		font = CreateFont(nHeight, nWidth, nEscapement, nOrientation, fnWeight, fdwItalic, 
 			fdwUnderline, fdwStrikeOut, fdwCharSet, fdwOututPrecision, fdwClipPrecision, 
 			fdwQuality, fdwPitchAndFamily, lpszFace);
 	}
 
-	void Figure::xlabel(std::string lab)
+	inline void Figure::xlabel(std::string lab)
 	{
 		windows[active_window].set_xlabel(lab);
 	}
 
-	void Figure::ylabel(std::string lab)
+	inline void Figure::ylabel(std::string lab)
 	{
 		windows[active_window].set_ylabel(lab);
 	}
 
-	void Figure::save(std::string file)
+	inline void Figure::title(std::string lab)
+	{
+		windows[active_window].set_title(lab);
+	}
+
+	inline void Figure::legend()
+	{
+		for (unsigned int i = 0; i != (x_dim * y_dim); ++i)
+		{
+			windows[i].activate_legend();
+		}
+	}
+
+	inline void Figure::save(std::string file)
 	{
 		// Set the suffix type of saved image
 		wchar_t file_type[] = L".bmp\0";
@@ -1110,7 +1530,7 @@ namespace cpplot {
 		// Set the cpplot::Globals::dir, so the CALLBACK function can see it
 		cpplot::Globals::dir = file_dir;
 
-		// Finally, show the window with the plot
+		// Finally, show the whole figure
 		this->show();
 	}
 
@@ -1134,7 +1554,8 @@ namespace cpplot {
 
 	inline unsigned int cumulative_sum(const std::vector<unsigned int>& container, size_t index)
 	{
-		assert(index <= container.size()); // TODO : COMMENT
+		// TODO : COMMENT
+		assert(index <= container.size()); 
 
 		unsigned int cum_sum = 0;
 		for (unsigned int i = 0; i != index; ++i)
@@ -1240,7 +1661,8 @@ int InitializeWindow(int width, int height)
 	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 	wc.lpszMenuName = NULL;
 	swprintf_s(cpplot::Globals::FigureName, cpplot::Globals::size, L"%d\0", 
-		cpplot::Globals::counter++);
+		cpplot::Globals::id++); // for each new Window change 
+									 // increment 1 to the id
 	wc.lpszClassName = cpplot::Globals::FigureName;
 	wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 	wc.style = CS_HREDRAW | CS_VREDRAW;
