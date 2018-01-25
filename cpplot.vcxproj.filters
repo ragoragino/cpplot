@@ -32,5 +32,14 @@
     <ClInclude Include="src\Figure.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Graph.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Window.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Constants.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

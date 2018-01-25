@@ -143,9 +143,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Bitmap.h" />
+    <ClInclude Include="src\Constants.h" />
     <ClInclude Include="src\example.h" />
     <ClInclude Include="src\Figure.h" />
+    <ClInclude Include="src\Graph.h" />
     <ClInclude Include="src\Header.h" />
+    <ClInclude Include="src\Window.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
