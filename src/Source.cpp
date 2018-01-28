@@ -12,8 +12,8 @@ int main()
 	std::vector<double> z(length);
 	for (unsigned int i = 0; i != length; ++i)
 	{
-		x[i] = 100.0 + (double)rand() / (double)RAND_MAX;
-		y[i] = 100.0 + (double)rand() / (double)RAND_MAX;
+		x[i] = -20.0 + 0.01 * (double)rand() / (double)RAND_MAX;
+		y[i] = -20.0 + 0.01 * (double)rand() / (double)RAND_MAX;
 		z[i] = -10.0 * (double)rand() / (double)RAND_MAX;
 	}
 	/*

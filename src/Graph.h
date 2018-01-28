@@ -68,44 +68,6 @@ namespace cpplot {
 		return no_digits;
 	}
 
-	void snprintf_scientific(char * buffer, unsigned int size, double value)
-	{
-		double number = value;
-		unsigned int exponent = 0;
-
-		if (value >= 1.0 && value < 10.0)
-		{
-			exponent = 0;
-		}
-		else if (value >= 10.0)
-		{
-
-			while (number >= 10.0)
-			{
-				exponent += 1;
-				number /= 10.0;
-			}
-
-			number = value / pow(10, exponent);
-		}
-		else
-		{
-			while (number < 1.0)
-			{
-				exponent -= 1;
-				number *= 10.0;
-			}
-
-			number = value * pow(10, exponent);
-		}
-
-		if (value < 0)
-		{
-			
-		}
-
-	}
-
 	// Global variables
 	namespace Globals
 	{
@@ -324,7 +286,7 @@ namespace cpplot {
 		Axis() : legend_state{ false } {};
 
 		void show_ticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
-			const std::vector<double>& range, HFONT font) const;
+			std::vector<double> range, HFONT font); // range by value!
 
 		void show_title(HDC hdc, HWND hwnd, RECT rect, HFONT font) const;
 
@@ -390,8 +352,10 @@ namespace cpplot {
 	};
 
 	void Axis::show_ticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
-		const std::vector<double>& range, HFONT font) const
+		std::vector<double> range, HFONT font)
 	{
+		static unsigned int call_counter = 0;
+
 		// Set proper text alignment
 		unsigned int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_TOP);
 
@@ -544,37 +508,34 @@ namespace cpplot {
 		double y_factor = 0.0;
 		double y_diff = range[3] - range[2];
 
-		// First we check whether the difference is not too small, so that we 
-		// should extract a certain value and keep only the rest in the renderinf
-		// of the axis -> e.g. when range is from 100.000001 to 100.000002, then
-		// plot 0.000001 and 0.000002 and add 100 to the label
-
 		// Automatic scientific notation
 		unsigned int y_value_digits = 0; // overall number of digits
 		unsigned int y_value_int_digits = 0; // number of integral digits
 		unsigned int exp_value_capacity = 0; // how many values are expected
 		bool scientific = 0; // whether values will be rendered in the scientific notation
 
-		// TODO
+		// First check whether the difference is not too small, so that we 
+		// should extract a certain value and keep only the rest in the rendering
+		// of the axis -> e.g. when range is from 100.000001 to 100.000002, then
+		// plot 0.000001 and 0.000002 in the scientific notation and add 100 to the label
 		if (y_diff <= pow(10.0, -MIN_RANGE_DIFF))
 		{
 			scientific = 1;
 
-			//add-on
-
-			// 6 because basic notation is: e.g. 1.5e10
-			y_value_digits = 6 + SCIENTIFIC_FRAC_DIGITS;
-
-			// Get the exponent of the double
-			int exponent;
-			frexp(range[2], &exponent);
-
-			// In the case of negative exponent, the notation will 
-			// need one more space for minus. E.g. 1.5e-10.
-			if (exponent < 0)
+			// Add-on that is going to be extracted and added to the label
+			// Ranges need to be internally changed -> that is the reason why
+			// range vector needs to be passed by value!
+			int add_on = (int)range[2];
+			range[2] = range[2] - add_on;
+			range[3] = range[3] - add_on;
+			if (call_counter++ == 0)
 			{
-				++y_value_digits;
+				ylabel += " [ " + std::to_string(add_on) + "+ ]";
 			}
+
+			// 6 is a constant because basic notation is: 
+			// e.g. (+/-)1.(SCIENTIFIC_FRAC_DIGITS)e(+/-)10
+			y_value_digits = 6 + SCIENTIFIC_FRAC_DIGITS;
 
 			// In case of negative number, also increase number of digits
 			if (range[2] < 0)
@@ -586,18 +547,9 @@ namespace cpplot {
 		{
 			scientific = 1;
 
+			// 6 is a constant because basic notation is: 
+			// e.g. (+/-)1.(SCIENTIFIC_FRAC_DIGITS)e(+/-)10
 			y_value_digits = 6 + SCIENTIFIC_FRAC_DIGITS;
-
-			// Get the exponent of the double
-			int exponent;
-			frexp(range[2], &exponent);
-
-			// In the case of negative exponent, the notation will 
-			// need one more space for minus. E.g. 1.5e-10.
-			if (exponent < 0)
-			{
-				++y_value_digits;
-			}
 
 			// In case of negative number, also increase number of digits
 			if (range[2] < 0)
@@ -606,7 +558,7 @@ namespace cpplot {
 			}
 		}
 
-		// nothing, mult or div
+		// nothing, multication or division group
 		unsigned int y_op_sign = 0; 
 
 		// Find the multiplicative/divisive factor
@@ -637,7 +589,7 @@ namespace cpplot {
 			}
 		}
 
-		// Find the appropriate tick and value dispersion 
+		// Find appropriate tick and value dispersion 
 		double y_value_period = 2.0;
 		double y_tick_period = 1.0;
 		if (y_diff >= 20.0 && y_diff < 40.0)
@@ -680,7 +632,6 @@ namespace cpplot {
 		// Pre-compute variables
 		double win_length_y = y_rect.bottom - y_rect.top;
 		double length_y = range[3] - range[2];
-
 		x_coord = y_rect.right;
 
 		// Render ticks
@@ -695,14 +646,13 @@ namespace cpplot {
 			y_tick += y_tick_period_adj;
 		}
 
-		// Render values
 		x_coord -= (unsigned int)(text_factor * y_stick);
 		std::wstring y_text;
 
 		// Set bottom and center text alignment
 		SetTextAlign(hdc, TA_CENTER | TA_BOTTOM);
 
-		// Set font rotated by 90 degrees
+		// Set font rotation by 90 degrees
 		LOGFONT lf;
 		GetObject(font, sizeof(LOGFONT), &lf);
 		lf.lfEscapement = 900;
@@ -731,9 +681,17 @@ namespace cpplot {
 				++exp_value_capacity;
 			}
 		}
+		else
+		{
+			double y_value_c = y_value;
+			while (y_value_c <= range[3])
+			{
+				y_value_c += y_value_period_adj;
+				++exp_value_capacity;
+			}
+		}
 
 		// Find correct text length and max capacity of the rectangle
-		// Do not consider dot in av_value_length -> negligible effect
 		unsigned int av_value_length = AXIS_VALUE_SPACE +
 			y_value_digits * textMetric.tmAveCharWidth;
 		unsigned int max_value_capacity = (y_rect.bottom - y_rect.top) / av_value_length;
@@ -752,11 +710,11 @@ namespace cpplot {
 			y_value_period_adj *= halving;
 		}
 
-		char sbuffer[100];
-		wchar_t wbuffer[100];
-
 		// Make proper format for the text rendering via snprintf
 		// char *format = "% int . frac f" or scientific notation
+		char *sbuffer = new char[y_value_digits + 1];
+		wchar_t *wbuffer = new wchar_t[y_value_digits + 1];
+
 		char format[6];
 		if (!scientific)
 		{
@@ -768,6 +726,15 @@ namespace cpplot {
 			format[4] = 'f';
 			format[5] = '\0';
 		}
+		else
+		{
+			format[0] = '%';
+			snprintf(&format[1], 2, "%u", 1);
+			format[2] = '.';
+			snprintf(&format[3], 2, "%u", SCIENTIFIC_FRAC_DIGITS);
+			format[4] = 'e';
+			format[5] = '\0';
+		}
 
 		// Render the text
 		while (y_value < range[3])
@@ -775,20 +742,10 @@ namespace cpplot {
 			y_coord = y_rect.bottom -
 				(unsigned int)round((y_value - range[2]) * win_length_y / length_y);
 
-			if (scientific)
-			{
-				// + 1 for null-termination
-				// Separate function here because there is no guarantee from snprint
-				// that it will write the whole number in specified length
-				snprintf_scientific(sbuffer, y_value_digits + 1, y_value);
-			}
-			else
-			{
-				// + 1 for null-termination
-				snprintf(sbuffer, y_value_digits + 1, format, y_value);
-			}
+			// + 1 in y_value_digits for null-termination
+			snprintf(sbuffer, y_value_digits + 1, format, y_value);
 				
-			MultiByteToWideChar(CP_UTF8, 0, sbuffer, -1, wbuffer, 100);
+			MultiByteToWideChar(CP_UTF8, 0, sbuffer, -1, wbuffer, y_value_digits + 1);
 			TextOut(hdc, x_coord, y_coord, wbuffer, y_value_digits);
 
 			y_value += y_value_period_adj;
@@ -800,6 +757,10 @@ namespace cpplot {
 
 		// Clean graphic objects
 		DeleteObject(hBoxPen);
+		
+		// Clean allocated buffers 
+		delete[] sbuffer;
+		delete[] wbuffer;
 	}
 
 	void Axis::show_xlabel(HDC hdc, HWND hwnd, RECT rect, HFONT font) const
