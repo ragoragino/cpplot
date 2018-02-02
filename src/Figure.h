@@ -8,7 +8,6 @@ TODO:
 - finish assymetric Figure constructor
 - check for data
 - normed histogram
-- finalize CreateImage class
 */
 
 int InitializeWindow(int width, int height);
@@ -70,9 +69,7 @@ namespace cpplot
 
 		void paint(HDC hdc, HWND hwnd, RECT client_area);
 
-		void save(std::string file);
-
-		wchar_t *file_dir; // file directory
+		void save(std::string file, std::string extension);
 
 	private:
 		unsigned int x_dim, y_dim; // dimensionality of the plotting area
@@ -89,7 +86,7 @@ namespace cpplot
 	Figure::Figure(const std::vector<unsigned int>& in_width, const std::vector<unsigned int>& in_height, 
 		const std::vector<COLORREF>& in_colors) : x_dim{ in_width.size() }, y_dim{ in_height.size() }, 
 		width{ in_width }, height{ in_height }, colors{ in_colors }, win_height{ 0 }, win_width{ 0 }, 
-		active_window { -1 }, file_dir{ nullptr }
+		active_window { -1 }
 	{
 		// Set default font
 		LOGFONT lf;
@@ -138,8 +135,7 @@ namespace cpplot
 	}
 
 	Figure::Figure(unsigned int in_width, unsigned int in_height, COLORREF colors) : 
-		x_dim{ 1 }, y_dim{ 1 }, width(1, in_width), height(1, in_height), active_window{ -1 },
-		file_dir{ nullptr }
+		x_dim{ 1 }, y_dim{ 1 }, width(1, in_width), height(1, in_height), active_window{ -1 }
 	{
 		// Set default font
 		LOGFONT lf;
@@ -342,25 +338,31 @@ namespace cpplot
 		}
 	}
 
-	inline void Figure::save(std::string file)
+	inline void Figure::save(std::string file, std::string extension)
 	{
 		// Set the suffix type of saved image
-		wchar_t file_type[] = L".bmp\0";
-		
+		wchar_t *ext_dir = new wchar_t[extension.size() + 1];
+		MultiByteToWideChar(CP_UTF8, 0, extension.c_str(), -1, ext_dir, extension.size() + 1);
+	
 		// Allocate enough space to hold also the suffix of type
-		file_dir = new wchar_t[file.size() + sizeof(file_type) / sizeof(wchar_t)]; 
+		wchar_t *file_dir = new wchar_t[file.size() + extension.size() + 2];
 
 		// Copy the original string to the file_dir buffer
-		MultiByteToWideChar(CP_UTF8, 0, file.c_str(), -1, file_dir, file.size());
+		MultiByteToWideChar(CP_UTF8, 0, file.c_str(), -1, file_dir, file.size() + 1);
+		file_dir[file.size()] = L'.';
 
 		// Copy the suffix type to the buffer
-		wcscpy_s(file_dir + file.size(), sizeof(file_type) / sizeof(wchar_t), file_type);
+		wcscpy_s(file_dir + file.size() + 1, extension.size() + 1, ext_dir);
 
-		// Set the cpplot::Globals::dir, so the CALLBACK function can see it
+		// Set the cpplot::Globals::dir and cpplot::Globals::ext, so the CALLBACK function can see it
 		cpplot::Globals::dir = file_dir;
+		cpplot::Globals::ext = ext_dir;
 
 		// Finally, show the whole figure
 		this->show();
+
+		delete[] ext_dir;
+		delete[] file_dir;
 	}
 
 	Figure::~Figure()
@@ -373,12 +375,6 @@ namespace cpplot
 
 		// Free the buffer allocated by allocate
 		alloc.deallocate(windows, x_dim * y_dim);
-
-		// Delete file_dir, if allocated
-		if (file_dir)
-		{
-			delete[] file_dir;
-		}
 	};
 }
 
@@ -403,10 +399,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		cpplot::Globals::figure->paint(hdc, hwnd, client_area);
 
 		// Save the image and destroy window
-		if (window_ready && cpplot::Globals::dir)
+		if (window_ready && cpplot::Globals::dir && cpplot::Globals::ext)
 		{
-			CreateImage2(hwnd, hdc, cpplot::Globals::dir);
+			CreateImage2(hwnd, hdc, cpplot::Globals::dir, cpplot::Globals::ext);
 			cpplot::Globals::dir = nullptr;
+			cpplot::Globals::ext = nullptr;
 			DestroyWindow(hwnd);
 		}
 		

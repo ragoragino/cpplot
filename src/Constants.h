@@ -104,3 +104,8 @@
 #ifndef SCIENTIFIC_FRAC_DIGITS
 #define SCIENTIFIC_FRAC_DIGITS 2
 #endif
+
+// Maximal size of extension for saving
+#ifndef MAX_EXTENSION_SIZE
+#define MAX_EXTENSION_SIZE 10
+#endif

@@ -83,6 +83,9 @@ namespace cpplot {
 
 		// Pointer to directory for saving the image
 		static wchar_t *dir = nullptr;
+
+		// Type of the saved image
+		static wchar_t* ext = nullptr;
 	};
 
 	// ABC
