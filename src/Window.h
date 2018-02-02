@@ -25,6 +25,13 @@ namespace cpplot
 		void prepare(const std::vector<double>& in_y, std::string in_name,
 			std::string in_type, unsigned int in_size, COLORREF in_color);
 
+		void hist(const std::vector<double>& data, int bins, std::string name,
+			unsigned int in_size, COLORREF color, bool normed);
+
+		void hist(const std::vector<double>& data, const std::vector<double>& bins,
+			std::string name, unsigned int in_size, COLORREF color, 
+			bool normed);
+
 		void show(HDC hdc, HWND hwnd, RECT rect, HFONT font);
 
 		bool is_window_initialized() const { return initialized; }
@@ -217,22 +224,20 @@ namespace cpplot
 		// Insert adequate Graph pointer 
 		if (in_type == "scatter")
 		{
-			graph[active_graph] = new Scatter();
+			graph[active_graph++] = new Scatter(in_x, in_y, in_size, in_color, xy_range);
 		}
 		else if (in_type == "line")
 		{
-			graph[active_graph] = new Line();
+			graph[active_graph++] = new Line(in_x, in_y, in_size, in_color, xy_range);
 		}
 		else
 		{
 			printf("Warning: Unrecognized plot type selected."
 				"Line type is initialized.");
 
-			graph[active_graph] = new Line();
+			graph[active_graph++] = new Line(in_x, in_y, in_size, in_color, xy_range);
 		}
 
-		// Send the variables to the Graph object
-		graph[active_graph++]->prepare(in_x, in_y, in_size, in_color, xy_range);
 
 		// Set legend parameters
 		axis->set_legend(in_name, in_type, in_color, in_size);
@@ -260,25 +265,60 @@ namespace cpplot
 		// Insert adequate Graph pointer 
 		if (in_type == "scatter")
 		{
-			graph[active_graph] = new Scatter();
+			graph[active_graph++] = new Scatter(x, in_y, in_size, in_color, xy_range);
 		}
 		else if (in_type == "line")
 		{
-			graph[active_graph] = new Line();
+			graph[active_graph++] = new Line(x, in_y, in_size, in_color, xy_range);
 		}
 		else
 		{
 			printf("Warning: Unrecognized plot type selected."
 				"Line type is initialized.");
 
-			graph[active_graph] = new Line();
+			graph[active_graph++] = new Line(x, in_y, in_size, in_color, xy_range);
 		}
-
-		// Send the variables to the Graph object
-		graph[active_graph++]->prepare(x, in_y, in_size, in_color, xy_range);
 
 		// Set legend parameters
 		axis->set_legend(in_name, in_type, in_color, in_size);
+
+		// Initialization of the window succedded
+		initialized = true;
+	}
+
+	void Window::hist(const std::vector<double>& data, int bins, std::string name,
+		unsigned int in_size, COLORREF color, bool normed)
+	{
+		// Check for number of plotted graphs in the window and resize the buffer if needed
+		if (active_graph >= max_graphs)
+		{
+			this->resize();
+		}
+
+		// Insert adequate Graph pointer 
+		graph[active_graph++] = new Histogram(data, bins, in_size, color, normed, xy_range);
+
+		// Set legend parameters
+		axis->set_legend(name, "hist", color, in_size);
+
+		// Initialization of the window succedded
+		initialized = true;
+	}
+
+	void Window::hist(const std::vector<double>& data, const std::vector<double>& bins,
+		std::string name, unsigned int in_size, COLORREF color, bool normed)
+	{
+		// Check for number of plotted graphs in the window and resize the buffer if needed
+		if (active_graph >= max_graphs)
+		{
+			this->resize();
+		}
+
+		// Insert adequate Graph pointer 
+		graph[active_graph++] = new Histogram(data, bins, in_size, color, normed, xy_range);
+
+		// Set legend parameters
+		axis->set_legend(name, "hist", color, in_size);
 
 		// Initialization of the window succedded
 		initialized = true;

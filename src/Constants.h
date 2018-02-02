@@ -81,6 +81,11 @@
 #define AXIS_VALUE_SPACE 10
 #endif
 
+// Beginning of axis values from the axis as a ratio to tick length
+#ifndef TICK_TEXT_FACTOR
+#define TICK_TEXT_FACTOR 2
+#endif
+
 // Minimum difference, under which a shift in the representation
 // of a number in the tick values changes
 // e.g. the for the range of 10.000001 to 10.000002, one

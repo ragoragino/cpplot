@@ -1,6 +1,72 @@
 #pragma once
-#include <windows.h>
 #include "Header.h"
+
+int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
+{
+	UINT  num = 0;          // number of image encoders
+	UINT  size = 0;         // size of the image encoder array in bytes
+
+	Gdiplus::ImageCodecInfo* pImageCodecInfo = NULL;
+
+	Gdiplus::GetImageEncodersSize(&num, &size);
+	if (size == 0)
+		return -1;  // Failure
+
+	pImageCodecInfo = (Gdiplus::ImageCodecInfo*)(malloc(size));
+	if (pImageCodecInfo == NULL)
+		return -1;  // Failure
+
+	Gdiplus::GetImageEncoders(num, size, pImageCodecInfo);
+
+	for (UINT j = 0; j < num; ++j)
+	{
+		if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0)
+		{
+			*pClsid = pImageCodecInfo[j].Clsid;
+			free(pImageCodecInfo);
+			return j;  // Success
+		}
+	}
+
+	free(pImageCodecInfo);
+	return -1;  // Failure
+}
+
+void CreateImage2(HWND hwnd, HDC hdc, wchar_t *dir)
+{
+	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+	ULONG_PTR gdiplusToken;
+	Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+
+	HDC memDC = CreateCompatibleDC(hdc);
+
+	RECT rcClient;
+	GetClientRect(hwnd, &rcClient);
+
+	int nWidth = rcClient.right - rcClient.left;
+	int nHeight = rcClient.bottom - rcClient.top;
+
+	HDC memdc = CreateCompatibleDC(hdc);
+	HBITMAP hbitmap = CreateCompatibleBitmap(hdc, nWidth, nHeight);
+	HBITMAP oldbmp = (HBITMAP)SelectObject(memdc, hbitmap);
+	BitBlt(memdc, 0, 0, nWidth, nHeight, hdc, 0, 0, SRCCOPY | CAPTUREBLT);
+	SelectObject(memdc, oldbmp);
+
+	CLSID pngClsid;
+	HRESULT hresult = GetEncoderClsid(L"image/png", &pngClsid);
+	if (hresult < 0)
+	{
+		printf("The PNG encoder is not installed.\n");
+	}
+
+	Gdiplus::Bitmap bitm(hbitmap, NULL);
+	Gdiplus::Status s = bitm.Save(L"D:\\Materials\\Programming\\Projekty\\cpplot\\PLOT.png", &pngClsid);
+
+	std::cout << s << std::endl;
+
+	DeleteObject(hbitmap);
+	DeleteDC(memdc);
+}
 
 PBITMAPINFO CreateBitmapInfoStruct(HWND hwnd, HBITMAP hBmp);
 void CreateBMPFile(HWND hwnd, LPTSTR pszFile, PBITMAPINFO pbi,

@@ -2,10 +2,8 @@
 #include "Header.h"
 #include "Constants.h"
 
-
 namespace cpplot {
 
-	// Necessary declarations
 	class Figure;
 	inline unsigned int cumulative_sum(const std::vector<unsigned int>& container, size_t index)
 	{
@@ -91,10 +89,6 @@ namespace cpplot {
 	class Graph
 	{
 	public:
-		virtual void prepare(const std::vector<double>& in_x,
-			const std::vector<double>& in_y, unsigned int in_size,
-			COLORREF in_color, std::vector<double>& range) = 0;
-
 		virtual void show(HDC hdc, HWND hwnd, RECT rect,
 			const std::vector<double>& range) const = 0;
 
@@ -109,9 +103,7 @@ namespace cpplot {
 	class Scatter : public Graph
 	{
 	public:
-		Scatter() = default;
-
-		virtual void prepare(const std::vector<double>& in_x,
+		Scatter(const std::vector<double>& in_x,
 			const std::vector<double>& in_y, unsigned int in_size,
 			COLORREF in_color, std::vector<double>& range);
 
@@ -124,7 +116,7 @@ namespace cpplot {
 		std::vector<double> x, y;
 	};
 
-	void Scatter::prepare(const std::vector<double>& in_x,
+	Scatter::Scatter(const std::vector<double>& in_x,
 		const std::vector<double>& in_y, unsigned int in_size,
 		COLORREF in_color, std::vector<double>& range)
 	{
@@ -194,9 +186,7 @@ namespace cpplot {
 	class Line : public Graph
 	{
 	public:
-		Line() = default;
-
-		virtual void prepare(const std::vector<double>& in_x,
+		Line(const std::vector<double>& in_x,
 			const std::vector<double>& in_y, unsigned int in_size,
 			COLORREF in_color, std::vector<double>& range);
 
@@ -209,7 +199,7 @@ namespace cpplot {
 		std::map<double, double> data;
 	};
 
-	void Line::prepare(const std::vector<double>& in_x,
+	Line::Line(const std::vector<double>& in_x,
 		const std::vector<double>& in_y, unsigned int in_size,
 		COLORREF in_color, std::vector<double>& range)
 	{
@@ -280,6 +270,157 @@ namespace cpplot {
 		SelectObject(hdc, hGraphPreviousPen);
 	}
 
+	class Histogram : public Graph
+	{
+	public:
+		Histogram(const std::vector<double>& in_x,
+			const std::vector<double>& bins, unsigned int in_size,
+			COLORREF in_color, bool normed, std::vector<double>& range);
+
+		Histogram(const std::vector<double>& in_x, int bins, 
+			unsigned int in_size, COLORREF in_color, bool normed, 
+			std::vector<double>& range);
+
+		virtual void initialize(const std::vector<double>& in_x,
+			const std::vector<double>& bins, unsigned int in_size,
+			COLORREF in_color, bool normed, std::vector<double>& range);
+
+		virtual void show(HDC hdc, HWND hwnd, RECT rect,
+			const std::vector<double>& range) const;
+
+		virtual ~Histogram() = default;
+
+	private:
+		std::vector<double> x, y, bin_pos;
+	};
+
+	Histogram::Histogram(const std::vector<double>& in_x,
+		const std::vector<double>& bins, unsigned int in_size,
+		COLORREF in_color, bool normed, std::vector<double>& range)
+	{
+		this->initialize(in_x, bins, in_size, in_color, normed, range);
+	}
+
+	Histogram::Histogram(const std::vector<double>& in_x,
+		int bins, unsigned int in_size,	COLORREF in_color, 
+		bool normed, std::vector<double>& range)
+	{
+		// Find the max of x
+		double min_x = *std::min_element(in_x.begin(), in_x.end(),
+			[](const double& a, const double& b)
+		{ return a < b;  });
+		double max_x = *std::max_element(in_x.begin(), in_x.end(),
+			[](const double& a, const double& b)
+		{ return a < b;  });		
+
+		// Fill the positions of bins
+		const double offset = (max_x - min_x) / bins; 
+		bin_pos = std::vector<double>(bins + 1);
+		for (int i = 0; i != bins + 1; i++)
+		{
+			bin_pos[i] = min_x + i * offset;
+		}
+
+		this->initialize(in_x, bin_pos, in_size, in_color, normed, range);
+	}
+
+	void Histogram::initialize(const std::vector<double>& in_x,
+		const std::vector<double>& bins, unsigned int in_size,
+		COLORREF in_color, bool normed, std::vector<double>& range)
+	{
+		x = in_x;
+		color = in_color;
+		size = in_size;
+		if (bin_pos.empty()) { bin_pos = bins; }
+		y = std::vector<double>(bin_pos.size() - 1, 0.0);
+
+		// Sort x and find min and max of x
+		std::sort(x.begin(), x.end());
+		double min_x = x.front();
+		double max_x = x.back();
+
+		// Find the count of x values in the bucket
+		std::vector<double>::iterator y_iter = y.begin();
+		std::vector<double>::const_iterator bin_pos_iter = ++bin_pos.begin();
+		std::vector<double>::const_iterator x_iter = x.begin();
+		for (; bin_pos_iter != bin_pos.end(); bin_pos_iter++)
+		{
+			while (*x_iter < (*bin_pos_iter + FP_ERROR))
+			{
+				*y_iter += 1.0;
+				++x_iter;
+
+				if (x_iter == x.end()) { break; }
+			}
+
+			++y_iter;
+		}
+
+		// TODO : Normalize
+		if (normed)
+		{
+
+		}
+
+		// Find the offset from the starting x
+		double max_y = *std::max_element(y.begin(), y.end(),
+			[](const double& a, const double& b)
+		{ return a < b;  });
+		double min_y = *std::min_element(y.begin(), y.end(),
+			[](const double& a, const double& b)
+		{ return a < b;  });
+
+		// Set x and y range for Window member range
+		range[0] = range[0] < min_x ? range[0] : min_x;
+		range[1] = range[1] > max_x ? range[1] : max_x;
+		range[2] = range[2] < 0.0 ? range[2] : 0.0;
+		range[3] = range[3] > max_y ? range[3] : max_y;
+	}
+
+	void Histogram::show(HDC hdc, HWND hwnd, RECT rect,
+		const std::vector<double>& range) const
+	{
+		double adj_min_x = range[0];
+		double adj_max_x = range[1];
+		double adj_min_y = range[2];
+		double adj_max_y = range[3];
+
+		// Pre-compute variables
+		double win_length_x = rect.right - rect.left;
+		double win_length_y = rect.bottom - rect.top;
+		double length_x = adj_max_x - adj_min_x;
+		double length_y = adj_max_y - adj_min_y;
+
+		// Set appropriate graph properties
+		HPEN hGraphPen = CreatePen(PS_SOLID, size, BLACK);
+		HBRUSH hGraphBrush = CreateSolidBrush(color);
+		HPEN hGraphPreviousPen = (HPEN)SelectObject(hdc, hGraphPen);
+		HBRUSH hGraphPreviousBrush = (HBRUSH)SelectObject(hdc, hGraphBrush);
+
+		// Render the histogram rectangles
+		RECT bin_rect;
+		bin_rect.bottom = rect.bottom -
+			(unsigned int)round((0.0 - adj_min_y) * win_length_y / length_y);
+		for (int i = 0; i != bin_pos.size() - 1; i++)
+		{
+			bin_rect.left = rect.left +
+				(unsigned int)round((bin_pos[i] - adj_min_x) * win_length_x / length_x);
+			bin_rect.right = rect.left +
+				(unsigned int)round((bin_pos[i + 1] - adj_min_x) * win_length_x / length_x);
+			bin_rect.top = rect.bottom -
+				(unsigned int)round((y[i] - adj_min_y) * win_length_y / length_y);
+			Rectangle(hdc, bin_rect.left, bin_rect.top, bin_rect.right, bin_rect.bottom);
+		}
+
+		// Delete graphics objects
+		DeleteObject(hGraphPen);
+		DeleteObject(hGraphBrush);
+
+		// Set previous graphic properties
+		SelectObject(hdc, hGraphPreviousPen);
+		SelectObject(hdc, hGraphPreviousBrush);
+	}
+	
 	class Axis
 	{
 	public:
@@ -287,6 +428,15 @@ namespace cpplot {
 
 		void show_ticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
 			std::vector<double> range, HFONT font); // range by value!
+
+		void show_xticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
+			std::vector<double> range, TEXTMETRIC textMetric);
+
+		void show_yticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
+			std::vector<double> range, TEXTMETRIC textMetric);
+
+		void tick_value_map(double diff, double& y_tick_period_adj,
+			double& y_value_period_adj);
 
 		void show_title(HDC hdc, HWND hwnd, RECT rect, HFONT font) const;
 
@@ -351,109 +501,106 @@ namespace cpplot {
 		bool legend_state;
 	};
 
-	void Axis::show_ticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
-		std::vector<double> range, HFONT font)
+	void Axis::tick_value_map(double diff, double& y_tick_period_adj, 
+		double& y_value_period_adj)
 	{
-		static unsigned int call_counter = 0;
+		// nothing, multication or division group
+		unsigned int y_op_sign = 0;
+		double y_factor = 0.0;
 
-		// Set proper text alignment
-		unsigned int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_TOP);
+		// Find the multiplicative/divisive factor
+		if ((diff + FP_ERROR) < 10.0)
+		{
+			y_op_sign = 1;
 
-		// Get parameters of current font -> for proper rendering of axis values
-		TEXTMETRIC textMetric;
-		GetTextMetrics(hdc, &textMetric);
+			y_factor += 1.0;
+			diff *= 10.0;
+
+			while ((diff + FP_ERROR) < 10.0)
+			{
+				y_factor += 1.0;
+				diff *= 10.0;
+			}
+		}
+		else if ((diff - FP_ERROR) >= 100.0)
+		{
+			y_op_sign = 2;
+
+			y_factor += 1.0;
+			diff /= 10.0;
+
+			while ((diff - FP_ERROR) >= 100.0)
+			{
+				y_factor += 1.0;
+				diff /= 10.0;
+			}
+		}
+
+		// Find appropriate tick and value dispersion 
+		double y_value_period = 2.0;
+		double y_tick_period = 1.0;
+		if (diff >= 20.0 && diff < 40.0)
+		{
+			y_value_period = 5.0;
+			y_tick_period = 2.5;
+		}
+		else if (diff >= 40.0)
+		{
+			y_value_period = 10.0;
+			y_tick_period = 5.0;
+		}
+
+		// Set the graph-specific tick and value dispersion
+		y_value_period_adj = y_value_period;
+		y_tick_period_adj = y_tick_period;
+		switch (y_op_sign)
+		{
+		case 1:
+		{
+			y_value_period_adj /= pow(10.0, y_factor);
+			y_tick_period_adj /= pow(10.0, y_factor);
+		}
+		break;
+		case 2:
+		{
+			y_value_period_adj *= pow(10.0, y_factor);
+			y_tick_period_adj *= pow(10.0, y_factor);
+		}
+		break;
+		}
+	}
+
+	void Axis::show_xticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
+		std::vector<double> range, TEXTMETRIC textMetric)
+	{
+		/* *********************************
+		// X axis ticks and values rendering
+		********************************* */
 
 		// Set length of axis ticks
 		unsigned int x_stick = (unsigned int)(((x_rect.bottom - x_rect.top) -
 			2.0 * textMetric.tmHeight) / 3.0);
-		unsigned int y_stick = (unsigned int)(((y_rect.right - y_rect.left) -
-			2.0 * textMetric.tmHeight) / 3.0);
-
-		/* *********************************
-		// X axis ticks and values rendering
-		********************************* */
 
 		double x_factor = 0.0;
 		double x_diff = range[1] - range[0];
 		unsigned int x_op_sign = 0; // nothing, mult or div
 
-									// Find the multiplicative/divisive factor
-		if ((x_diff + FP_ERROR) < 10.0)
-		{
-			x_op_sign = 1;
-
-			x_factor += 1.0;
-			x_diff *= 10.0;
-
-			while ((x_diff + FP_ERROR) < 10.0)
-			{
-				x_factor += 1.0;
-				x_diff *= 10.0;
-			}
-		}
-		else if ((x_diff - FP_ERROR) >= 100.0)
-		{
-			x_op_sign = 2;
-
-			x_factor += 1.0;
-			x_diff /= 10.0;
-
-			while ((x_diff - FP_ERROR) >= 100.0)
-			{
-				x_factor += 1.0;
-				x_diff /= 10.0;
-			}
-		}
-
-		// Find the appropriate tick and value dispersion 
-		double x_value_period = 2.0;
-		double x_tick_period = 1.0;
-		if (x_diff >= 20.0 && x_diff < 40.0)
-		{
-			x_value_period = 5.0;
-			x_tick_period = 2.5;
-		}
-		else if (x_diff >= 40.0)
-		{
-			x_value_period = 10.0;
-			x_tick_period = 5.0;
-		}
-
-		// Set graph-specific tick and value dispersion
-		double x_value_period_adj = x_value_period;
-		double x_tick_period_adj = x_tick_period;
-		switch (x_op_sign)
-		{
-		case 1:
-		{
-			x_value_period_adj /= pow(10.0, x_factor);
-			x_tick_period_adj /= pow(10.0, x_factor);
-		}
-		break;
-		case 2:
-		{
-			x_value_period_adj *= pow(10.0, x_factor);
-			x_tick_period_adj *= pow(10.0, x_factor);
-		}
-		break;
-		}
+		// Obtain the appropriate steps for ticks and values
+		double x_value_period, x_tick_period;
+		this->tick_value_map(x_diff, x_tick_period, x_value_period);
 
 		// Find starting values for the first tick and value
-		unsigned int x_value_divisor = (int)ceil(range[0] / x_value_period_adj);
-		unsigned int x_tick_divisor = (int)ceil(range[0] / x_tick_period_adj);
+		int x_value_divisor = (int)ceil(range[0] / x_value_period);
+		int x_tick_divisor = (int)ceil(range[0] / x_tick_period);
 
-		double x_value = x_value_divisor * x_value_period_adj;
-		double x_tick = x_tick_divisor * x_tick_period_adj;
+		double x_value = x_value_divisor * x_value_period;
+		double x_tick = x_tick_divisor * x_tick_period;
 
 		// Pre-compute variables
 		double win_length_x = x_rect.right - x_rect.left;
 		double length_x = range[1] - range[0];
 
 		unsigned int x_coord, y_coord = x_rect.top;
-
-		// Set graphics attributes
-		HPEN hBoxPen = CreatePen(PS_SOLID, 1, BLACK);
-		SelectObject(hdc, hBoxPen);
 
 		// Render ticks
 		while (x_tick < range[1])
@@ -464,12 +611,11 @@ namespace cpplot {
 			MoveToEx(hdc, x_coord, y_coord, NULL);
 			LineTo(hdc, x_coord, y_coord + x_stick);
 
-			x_tick += x_tick_period_adj;
+			x_tick += x_tick_period;
 		}
 
 		// Render values
-		int text_factor = 2; // adjustment of the value below the bottom of the graph
-		y_coord += text_factor * x_stick;
+		y_coord += TICK_TEXT_FACTOR * x_stick;
 		std::wstring x_text;
 
 		// Test needed due to correct rendering of the notation of the number
@@ -480,11 +626,10 @@ namespace cpplot {
 				x_coord = x_rect.left +
 					(unsigned int)round((x_value - range[0]) * win_length_x / length_x);
 
-
 				x_text = std::to_wstring((int)x_value);
 				TextOut(hdc, x_coord, y_coord, x_text.c_str(), x_text.size());
 
-				x_value += x_value_period_adj;
+				x_value += x_value_period;
 			}
 		}
 		else
@@ -497,13 +642,24 @@ namespace cpplot {
 				x_text = std::to_wstring(x_value);
 				TextOut(hdc, x_coord, y_coord, x_text.c_str(), x_text.size());
 
-				x_value += x_value_period_adj;
+				x_value += x_value_period;
 			}
 		}
+
+	}
+
+
+	void Axis::show_yticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
+		std::vector<double> range, TEXTMETRIC textMetric)
+	{
+		static unsigned int call_counter = 0;
 
 		/* *********************************
 		// Y axis ticks and values rendering
 		********************************* */
+
+		unsigned int y_stick = (unsigned int)(((y_rect.right - y_rect.left) -
+			2.0 * textMetric.tmHeight) / 3.0);
 
 		double y_factor = 0.0;
 		double y_diff = range[3] - range[2];
@@ -558,81 +714,22 @@ namespace cpplot {
 			}
 		}
 
-		// nothing, multication or division group
-		unsigned int y_op_sign = 0; 
-
-		// Find the multiplicative/divisive factor
-		if ((y_diff + FP_ERROR) < 10.0)
-		{
-			y_op_sign = 1;
-
-			y_factor += 1.0;
-			y_diff *= 10.0;
-
-			while ((y_diff + FP_ERROR) < 10.0)
-			{
-				y_factor += 1.0;
-				y_diff *= 10.0;
-			}
-		}
-		else if ((y_diff - FP_ERROR) >= 100.0)
-		{
-			y_op_sign = 2;
-
-			y_factor += 1.0;
-			y_diff /= 10.0;
-
-			while ((y_diff - FP_ERROR) >= 100.0)
-			{
-				y_factor += 1.0;
-				y_diff /= 10.0;
-			}
-		}
-
-		// Find appropriate tick and value dispersion 
-		double y_value_period = 2.0;
-		double y_tick_period = 1.0;
-		if (y_diff >= 20.0 && y_diff < 40.0)
-		{
-			y_value_period = 5.0;
-			y_tick_period = 2.5;
-		}
-		else if (y_diff >= 40.0)
-		{
-			y_value_period = 10.0;
-			y_tick_period = 5.0;
-		}
-
-		// Set the graph-specific tick and value dispersion
-		double y_value_period_adj = y_value_period;
-		double y_tick_period_adj = y_tick_period;
-		switch (y_op_sign)
-		{
-		case 1:
-		{
-			y_value_period_adj /= pow(10.0, y_factor);
-			y_tick_period_adj /= pow(10.0, y_factor);
-		}
-		break;
-		case 2:
-		{
-			y_value_period_adj *= pow(10.0, y_factor);
-			y_tick_period_adj *= pow(10.0, y_factor);
-		}
-		break;
-		}
+		// Obtain the appropriate steps for ticks and values
+		double y_value_period, y_tick_period;
+		this->tick_value_map(y_diff, y_tick_period, y_value_period);
 
 		// Find the starting values for the first tick and value
-		int y_value_divisor = (int)ceil(range[2] / y_value_period_adj);
-		int y_tick_divisor = (int)ceil(range[2] / y_tick_period_adj);
+		int y_value_divisor = (int)ceil(range[2] / y_value_period);
+		int y_tick_divisor = (int)ceil(range[2] / y_tick_period);
 
-		double y_value = y_value_divisor * y_value_period_adj;
-		double y_tick = y_tick_divisor * y_tick_period_adj;
+		double y_value = y_value_divisor * y_value_period;
+		double y_tick = y_tick_divisor * y_tick_period;
 
 		// Pre-compute variables
 		double win_length_y = y_rect.bottom - y_rect.top;
 		double length_y = range[3] - range[2];
-		x_coord = y_rect.right;
+		unsigned int x_coord = y_rect.right;
+		unsigned int y_coord;
 
 		// Render ticks
 		while (y_tick < range[3])
@@ -643,22 +740,13 @@ namespace cpplot {
 			MoveToEx(hdc, x_coord, y_coord, NULL);
 			LineTo(hdc, x_coord - y_stick, y_coord);
 
-			y_tick += y_tick_period_adj;
+			y_tick += y_tick_period;
 		}
 
-		x_coord -= (unsigned int)(text_factor * y_stick);
+		x_coord -= (unsigned int)(TICK_TEXT_FACTOR * y_stick);
 		std::wstring y_text;
 
-		// Set bottom and center text alignment
-		SetTextAlign(hdc, TA_CENTER | TA_BOTTOM);
 
-		// Set font rotation by 90 degrees
-		LOGFONT lf;
-		GetObject(font, sizeof(LOGFONT), &lf);
-		lf.lfEscapement = 900;
-		HFONT lfont = CreateFontIndirect(&lf);
-		HFONT h_prev_font = (HFONT)SelectObject(hdc, (HGDIOBJ)(HFONT)(lfont));
-		
 		// If the values do not classify as scientific, find the number of integral
 		// and fractional digits -> e.g. 100.01 = 3 integral and 2 fractional
 		if (!scientific)
@@ -668,16 +756,16 @@ namespace cpplot {
 			while (y_value_c <= range[3])
 			{
 				current_int_digits = get_int_digits(y_value_c);
-				current_digits = current_int_digits + 
+				current_digits = current_int_digits +
 					get_frac_digits(y_value_c, MIN_RANGE_DIFF + 1);
-			
-				if(y_value_digits < current_digits)
+
+				if (y_value_digits < current_digits)
 				{
 					y_value_digits = current_digits;
 					y_value_int_digits = current_int_digits;
 				}
-			
-				y_value_c += y_value_period_adj;
+
+				y_value_c += y_value_period;
 				++exp_value_capacity;
 			}
 		}
@@ -686,7 +774,7 @@ namespace cpplot {
 			double y_value_c = y_value;
 			while (y_value_c <= range[3])
 			{
-				y_value_c += y_value_period_adj;
+				y_value_c += y_value_period;
 				++exp_value_capacity;
 			}
 		}
@@ -707,7 +795,7 @@ namespace cpplot {
 			}
 
 			exp_value_capacity = (unsigned int)ceil(exp_value_capacity / halving);
-			y_value_period_adj *= halving;
+			y_value_period *= halving;
 		}
 
 		// Make proper format for the text rendering via snprintf
@@ -718,7 +806,13 @@ namespace cpplot {
 		char format[6];
 		if (!scientific)
 		{
-			unsigned int y_value_frac_digits = y_value_digits - y_value_int_digits - 1;
+			unsigned int y_value_frac_digits = y_value_digits - y_value_int_digits;
+			if (y_value_frac_digits)
+			{
+				// minus one for the dot in case the number has fractional digits
+				--y_value_frac_digits;
+			}
+
 			format[0] = '%';
 			snprintf(&format[1], 2, "%u", y_value_int_digits);
 			format[2] = '.';
@@ -744,23 +838,53 @@ namespace cpplot {
 
 			// + 1 in y_value_digits for null-termination
 			snprintf(sbuffer, y_value_digits + 1, format, y_value);
-				
+
 			MultiByteToWideChar(CP_UTF8, 0, sbuffer, -1, wbuffer, y_value_digits + 1);
 			TextOut(hdc, x_coord, y_coord, wbuffer, y_value_digits);
 
-			y_value += y_value_period_adj;
+			y_value += y_value_period;
 		}
+
+		// Clean allocated buffers 
+		delete[] sbuffer;
+		delete[] wbuffer;
+	}
+
+	void Axis::show_ticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
+		std::vector<double> range, HFONT font)
+	{
+		// Set graphics attributes
+		HPEN hBoxPen = CreatePen(PS_SOLID, 1, BLACK);
+		SelectObject(hdc, hBoxPen);
+
+		// Set proper text alignment
+		unsigned int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_TOP);
+
+		// Get parameters of current font -> for proper rendering of axis values
+		TEXTMETRIC textMetric;
+		GetTextMetrics(hdc, &textMetric);
+
+		// Render ticks on the x axis
+		this->show_xticks(hdc, hwnd, x_rect, y_rect, range, textMetric);
+
+		// Set bottom and center text alignment
+		SetTextAlign(hdc, TA_CENTER | TA_BOTTOM);
+
+		// Set font rotation by 90 degrees
+		LOGFONT lf;
+		GetObject(font, sizeof(LOGFONT), &lf);
+		lf.lfEscapement = 900;
+		HFONT lfont = CreateFontIndirect(&lf);
+		HFONT h_prev_font = (HFONT)SelectObject(hdc, (HGDIOBJ)(HFONT)(lfont));
+
+		// Render ticks on the y axis
+		this->show_yticks(hdc, hwnd, x_rect, y_rect, range, textMetric);
 
 		// Set text alignment and font that was in place before rendering axis attributes
 		SetTextAlign(hdc, prev_text_align);
 		SelectObject(hdc, h_prev_font);
 
-		// Clean graphic objects
 		DeleteObject(hBoxPen);
-		
-		// Clean allocated buffers 
-		delete[] sbuffer;
-		delete[] wbuffer;
 	}
 
 	void Axis::show_xlabel(HDC hdc, HWND hwnd, RECT rect, HFONT font) const
@@ -913,6 +1037,21 @@ namespace cpplot {
 					LEGEND_SYMBOL_LENGTH * 0.75));
 				MoveToEx(hdc, begin_x, point_pos_y, NULL);
 				LineTo(hdc, end_x, point_pos_y);
+			}
+			else if (it->type == "hist")
+			{
+				hGraphPen = CreatePen(PS_SOLID, it->size, BLACK);
+				(HPEN)SelectObject(hdc, hGraphPen);
+
+				RECT hist_rect;
+				hist_rect.top = (unsigned int)(rect.top + current_offset);
+				hist_rect.bottom = (unsigned int)(rect.top + text_height + 
+					current_offset);
+				hist_rect.left = (unsigned int)((rect.left +
+					LEGEND_SYMBOL_LENGTH * 0.25));
+				hist_rect.right = (unsigned int)((rect.left +
+					LEGEND_SYMBOL_LENGTH * 0.75));
+				Rectangle(hdc, hist_rect.left, hist_rect.top, hist_rect.right, hist_rect.bottom);
 			}
 			else
 			{

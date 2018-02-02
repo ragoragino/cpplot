@@ -1,13 +1,14 @@
 #include "Header.h"
 #include "Window.h"
+#include "Bitmap.h"
 
 /*
 TODO:
--scientific notation in writing strings
--plot for x, y
--exceptions
--finish assymetric Figure constructor
+- exceptions
+- finish assymetric Figure constructor
 - check for data
+- normed histogram
+- finalize CreateImage class
 */
 
 int InitializeWindow(int width, int height);
@@ -26,24 +27,30 @@ namespace cpplot
 
 		// No assignment operator
 		Figure& operator=(const Figure& figure) = delete;
-		
+	
 		void plot(const std::vector<double>& x, const std::vector<double>& y, 
 			std::string name = "", std::string type = "line", unsigned int width = 1,
-			COLORREF color = WHITE,	std::vector<unsigned int> position = 
+			COLORREF color = WHITE, const std::vector<unsigned int>& position =
 			std::vector<unsigned int>{});
 
 		void plot(const std::vector<double>& y, std::string name = "", std::string
 			type = "line", unsigned int width = 1, COLORREF color = WHITE, 
-			std::vector<unsigned int> position = std::vector<unsigned int>{});
+			const std::vector<unsigned int>& position = std::vector<unsigned int>{});
 
 		void fplot(double(*func)(double x), double from, double to,
 			std::string name = "", std::string type = "line", 
 			unsigned int width = 1, COLORREF color = WHITE,
-			std::vector<unsigned int> position = std::vector<unsigned int>{});
+			const std::vector<unsigned int>& position = std::vector<unsigned int>{});
 
-		void hist(std::vector<double> data, std::vector<double> bins,
-			std::string name = "", COLORREF color = BLUE, bool normed = false,
-			std::vector<unsigned int> position = std::vector<unsigned int>{});
+		void hist(const std::vector<double>& data, int bins, std::string name = "",
+			unsigned int size = 1.0, COLORREF color = BLUE, bool normed = false,
+			const std::vector<unsigned int>& position = std::vector<unsigned int>{});
+
+		void hist(const std::vector<double>& data, const std::vector<double>& bins,
+			std::string name = "", unsigned int size = 1.0, COLORREF color = BLUE, bool normed = false,
+			const std::vector<unsigned int>& position = std::vector<unsigned int>{});
+
+		void plot_check(const std::vector<unsigned int>& position, unsigned int& local_window);
 
 		void xlabel(std::string xlab);
 
@@ -154,49 +161,27 @@ namespace cpplot
 
 	inline void Figure::plot(const std::vector<double>& x, const std::vector<double>& y, 
 		std::string name, std::string type, unsigned int width, COLORREF color, 
-		std::vector<unsigned int> position)
+		const std::vector<unsigned int>& position)
 	{
-		
+		unsigned int loc_active_window = 0;
+
+		// Perform all the necessary controls of input position
+		// and fill in current active window
+		this->plot_check(position, loc_active_window);
+
+		// Send the variables to the selected Window
+		windows[loc_active_window].prepare(x, y, name, type, width, color);
 	}
 
 	inline void Figure::plot(const std::vector<double>& y, std::string name,
-		std::string type, unsigned int width, COLORREF color, std::vector<unsigned int> 
-		position)
+		std::string type, unsigned int width, COLORREF color, 
+		const std::vector<unsigned int>& position)
 	{
-		unsigned int loc_active_window;
+		unsigned int loc_active_window = 0;
 
-		// Check if the input position is default
-		if (position.size() == 0)
-		{
-			++active_window;
-			loc_active_window = active_window;
-		}
-		else if (position.size() != 2) // or if it is not of size 2
-		{
-			printf("Incompatible position! Default graph position taken!");
-
-			++active_window;
-			loc_active_window = active_window;
-		}
-		else
-		{
-			// Catch outside the boundaries positions of the graph
-			if (position[0] >= y_dim || position[1] >= x_dim)
-			{
-				throw std::exception();
-			}
-
-			loc_active_window = x_dim * position[0] + position[1];
-
-			active_window = loc_active_window;
-		}
-
-		// If the number of plot calls is larger than number of graphs
-		if (loc_active_window >= (x_dim * y_dim))
-		{
-			printf("All individual graphs are already set! No action taken!");
-			return;
-		}
+		// Perform all the necessary controls of input position
+		// and fill in current active window
+		this->plot_check(position, loc_active_window);
 
 		// Send the variables to the selected Window
 		windows[loc_active_window].prepare(y, name, type, width, color);
@@ -204,7 +189,7 @@ namespace cpplot
 
 	void Figure::fplot(double(*func)(double x), double from, double to, 
 		std::string name, std::string type, unsigned int width, 
-		COLORREF color,	std::vector<unsigned int> position)
+		COLORREF color, const std::vector<unsigned int>& position)
 	{
 		static constexpr unsigned int length = 1000;
 		std::vector<double> x(length);
@@ -218,7 +203,70 @@ namespace cpplot
 
 		this->plot(y, name, type, width, color, position);
 	}
+
+	inline void Figure::hist(const std::vector<double>& data, int bins, std::string name,
+		unsigned int size, COLORREF color, bool normed, const std::vector<unsigned int>& position)
+	{
+		unsigned int loc_active_window = 0;
+
+		// Perform all the necessary controls of input position
+		// and fill in current active window
+		this->plot_check(position, loc_active_window);
+
+		// Send the variables to the selected Window
+		windows[loc_active_window].hist(data, bins, name, size, color, normed);
+	}
 	
+	inline void Figure::hist(const std::vector<double>& data, const std::vector<double>& bins,
+		std::string name, unsigned int size, COLORREF color, bool normed,
+		const std::vector<unsigned int>& position)
+	{
+		unsigned int loc_active_window = 0;
+
+		// Perform all the necessary controls of input position
+		// and fill in current active window
+		this->plot_check(position, loc_active_window);
+
+		// Send the variables to the selected Window
+		windows[loc_active_window].hist(data, bins, name, size, color, normed);
+	}
+
+	inline void Figure::plot_check(const std::vector<unsigned int>& position, unsigned int& local_window)
+	{
+		// Check if the input position is default
+		if (position.size() == 0)
+		{
+			++active_window;
+			local_window = active_window;
+		}
+		else if (position.size() != 2) // or if it is not of size 2
+		{
+			printf("Incompatible position! Default graph position taken!");
+
+			++active_window;
+			local_window = active_window;
+		}
+		else
+		{
+			// Catch outside the boundaries positions of the graph
+			if (position[0] >= y_dim || position[1] >= x_dim)
+			{
+				throw std::exception();
+			}
+
+			local_window = x_dim * position[0] + position[1];
+
+			active_window = local_window;
+		}
+
+		// If the number of plot calls is larger than number of graphs
+		if (local_window >= (x_dim * y_dim))
+		{
+			printf("All individual graphs are already set! No action taken!");
+			return;
+		}
+	}
+
 	inline void Figure::paint(HDC hdc, HWND hwnd, RECT client_area)
 	{
 		// Select default font
@@ -332,9 +380,6 @@ namespace cpplot
 			delete[] file_dir;
 		}
 	};
-
-	
-
 }
 
 
@@ -360,7 +405,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		// Save the image and destroy window
 		if (window_ready && cpplot::Globals::dir)
 		{
-			CreateImage(hwnd, hdc, cpplot::Globals::dir);
+			CreateImage2(hwnd, hdc, cpplot::Globals::dir);
 			cpplot::Globals::dir = nullptr;
 			DestroyWindow(hwnd);
 		}
