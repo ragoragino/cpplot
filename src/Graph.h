@@ -99,6 +99,12 @@ namespace cpplot {
 	class Graph
 	{
 	public:
+		Graph(COLORREF in_color, unsigned int in_size) :
+			color(in_color), size(in_size), render_pointer(nullptr) {};
+
+		Graph(COLORREF in_color, unsigned int in_size, RenderObjects *render_ptr) : 
+		color(in_color), size(in_size), render_pointer(render_ptr) {};
+
 		virtual void show(HDC hdc, HWND hwnd, RECT rect,
 			const std::vector<double>& range) const = 0;
 
@@ -107,6 +113,7 @@ namespace cpplot {
 	protected:
 		COLORREF color;
 		unsigned int size;
+		RenderObjects *render_pointer;
 	};
 
 	// Derived class for scatterplots
@@ -115,7 +122,8 @@ namespace cpplot {
 	public:
 		Scatter(const std::vector<double>& in_x,
 			const std::vector<double>& in_y, unsigned int in_size,
-			COLORREF in_color, std::vector<double>& range);
+			COLORREF in_color, std::vector<double>& range,
+			RenderObjects *render_ptr);
 
 		virtual void show(HDC hdc, HWND hwnd, RECT rect,
 			const std::vector<double>& range) const;
@@ -128,13 +136,10 @@ namespace cpplot {
 
 	Scatter::Scatter(const std::vector<double>& in_x,
 		const std::vector<double>& in_y, unsigned int in_size,
-		COLORREF in_color, std::vector<double>& range)
+		COLORREF in_color, std::vector<double>& range,
+		RenderObjects *render_ptr) : x{ in_x }, y{ in_y }, 
+		Graph(in_color, in_size, render_ptr)
 	{
-		x = in_x;
-		y = in_y;
-		size = in_size;
-		color = in_color;
-
 		// Find min and max of x and y 
 		double max_x = *std::max_element(x.begin(), x.end());
 		double min_x = *std::min_element(x.begin(), x.end());
@@ -151,45 +156,16 @@ namespace cpplot {
 	void Scatter::show(HDC hdc, HWND hwnd, RECT rect,
 		const std::vector<double>& range) const
 	{
-		// Set adjusted min and max values, adjusted for the 
-		// free space before/after the first/last point
-		double adj_min_x = range[0];
-		double adj_max_x = range[1];
-		double adj_min_y = range[2];
-		double adj_max_y = range[3];
-
-		// Pre-compute variables
-		double win_length_x = rect.right - rect.left;
-		double win_length_y = rect.bottom - rect.top;
-		double length_x = adj_max_x - adj_min_x;
-		double length_y = adj_max_y - adj_min_y;
-		unsigned int x_coord, y_coord;
-
-		// Set appropriate graph properties
-		HPEN hGraphPen = CreatePen(PS_SOLID, size, color);
-		HBRUSH hGraphBrush = CreateSolidBrush(color);
-		HPEN hGraphPreviousPen = (HPEN)SelectObject(hdc, hGraphPen);
-		HBRUSH hGraphPreviousBrush = (HBRUSH)SelectObject(hdc, hGraphBrush);
-
-		// Draw the points
-		unsigned int x_size = x.size();
-		for (unsigned int i = 0; i != x_size; ++i)
+		// Check for nullptr
+		if (!render_pointer)
 		{
-			x_coord = rect.left +
-				(unsigned int)round((x[i] - adj_min_x) * win_length_x / length_x);
-			y_coord = rect.bottom -
-				(unsigned int)round((y[i] - adj_min_y) * win_length_y / length_y);
-
-			Ellipse(hdc, x_coord - 1, y_coord - 1, x_coord + 1, y_coord + 1);
+			RenderObjects *local_render_ptr = &RenderScatterPoints();
+			local_render_ptr->renderPoints(hdc, x, y, rect, range, color, size);
 		}
-
-		// Clean graphic objects
-		DeleteObject(hGraphPen);
-		DeleteObject(hGraphBrush);
-
-		// Set previous graphic properties
-		SelectObject(hdc, hGraphPreviousPen);
-		SelectObject(hdc, hGraphPreviousBrush);
+		else
+		{
+			render_pointer->renderPoints(hdc, x, y, rect, range, color, size);
+		}
 	}
 
 	// Derived class for line plots
@@ -198,7 +174,8 @@ namespace cpplot {
 	public:
 		Line(const std::vector<double>& in_x,
 			const std::vector<double>& in_y, unsigned int in_size,
-			COLORREF in_color, std::vector<double>& range);
+			COLORREF in_color, std::vector<double>& range,
+			RenderObjects *render_ptr);
 
 		virtual void show(HDC hdc, HWND hwnd, RECT rect,
 			const std::vector<double>& range) const;
@@ -211,15 +188,13 @@ namespace cpplot {
 
 	Line::Line(const std::vector<double>& in_x,
 		const std::vector<double>& in_y, unsigned int in_size,
-		COLORREF in_color, std::vector<double>& range)
+		COLORREF in_color, std::vector<double>& range,
+		RenderObjects *render_ptr) : Graph(in_color, in_size, render_ptr)
 	{
 		for (unsigned int i = 0; i != in_x.size(); ++i)
 		{
 			data[in_x[i]] = in_y[i]; // TODO : OPTIMIZE
 		}
-
-		size = in_size;
-		color = in_color;
 
 		// Find min and max of x and y 
 		double min_x = data.begin()->first;
@@ -241,43 +216,16 @@ namespace cpplot {
 	void Line::show(HDC hdc, HWND hwnd, RECT rect,
 		const std::vector<double>& range) const
 	{
-		double adj_min_x = range[0];
-		double adj_max_x = range[1];
-		double adj_min_y = range[2];
-		double adj_max_y = range[3];
-
-		// Pre-compute variables
-		double win_length_x = rect.right - rect.left;
-		double win_length_y = rect.bottom - rect.top;
-		double length_x = adj_max_x - adj_min_x;
-		double length_y = adj_max_y - adj_min_y;
-
-		// Move to the starting point
-		unsigned int x_coord = rect.left +
-			(unsigned int)round((data.begin()->first - adj_min_x) * win_length_x / length_x);
-		unsigned int y_coord = rect.bottom -
-			(unsigned int)round((data.begin()->second - adj_min_y) * win_length_y / length_y);
-		MoveToEx(hdc, x_coord, y_coord, NULL);
-
-		// Set appropriate graph properties and draw the lines
-		HPEN hGraphPen = CreatePen(PS_SOLID, size, color);
-		HPEN hGraphPreviousPen = (HPEN)SelectObject(hdc, hGraphPen);
-		for (std::map<double, double>::const_iterator it = data.begin();
-			it != data.end(); ++it)
+		// Check for nullptr
+		if (!render_pointer)
 		{
-			x_coord = rect.left +
-				(unsigned int)round((it->first - adj_min_x) * win_length_x / length_x);
-			y_coord = rect.bottom -
-				(unsigned int)round((it->second - adj_min_y) * win_length_y / length_y);
-
-			LineTo(hdc, x_coord, y_coord);
+			RenderObjects *local_render_ptr = &RenderLinesFull();
+			local_render_ptr->renderLines(hdc, data, rect, range, color, size);
 		}
-
-		// Delete graphics objects
-		DeleteObject(hGraphPen);
-
-		// Set previous graphic properties
-		SelectObject(hdc, hGraphPreviousPen);
+		else
+		{
+			render_pointer->renderLines(hdc, data, rect, range, color, size);
+		}
 	}
 
 	class Histogram : public Graph
@@ -305,7 +253,8 @@ namespace cpplot {
 
 	Histogram::Histogram(const std::vector<double>& in_x,
 		const std::vector<double>& bins, unsigned int in_size, COLORREF in_color, 
-		bool normed, std::vector<double>& range)
+		bool normed, std::vector<double>& range) : x(in_x), y(bins),
+		bin_pos(bins), Graph(in_color, in_size)
 	{
 		this->initialize(in_x, bins, in_size, in_color, normed, range);
 
@@ -323,7 +272,8 @@ namespace cpplot {
 	Histogram::Histogram(const std::vector<double>& in_x,
 		int bins, const std::vector<double>& max_min_range, 
 		unsigned int in_size, COLORREF in_color,
-		bool normed, std::vector<double>& range)
+		bool normed, std::vector<double>& range) : 
+		x(in_x), y(bins, 0.0), Graph(in_color, in_size)
 	{
 		// Find the max of x
 		double min_x, max_x;
@@ -366,12 +316,6 @@ namespace cpplot {
 		const std::vector<double>& bins, unsigned int in_size, 
 		COLORREF in_color, bool normed, std::vector<double>& range)
 	{
-		x = in_x;
-		color = in_color;
-		size = in_size;
-		if (bin_pos.empty()) { bin_pos = bins; }
-		y = std::vector<double>(bin_pos.size() - 1, 0.0);
-
 		std::sort(x.begin(), x.end());
 
 		// Find the count of x values in the bucket
@@ -504,6 +448,9 @@ namespace cpplot {
 		void set_title(std::string in_title) { title = in_title; }
 
 		void set_legend(std::string name, std::string type, COLORREF color,
+			unsigned int size, RenderObjects *render_ptr);
+
+		void set_legend(std::string name, std::string type, COLORREF color,
 			unsigned int size);
 
 		void activate_legend() { legend_state = true; }
@@ -517,18 +464,38 @@ namespace cpplot {
 		bool is_legend_activated() const { return legend_state; }
 
 	private:
-		struct LEGEND
+		class LEGEND
 		{
-			LEGEND() = default;
+		public:
+			LEGEND() = delete;
 
 			LEGEND(std::string in_name, std::string in_type, COLORREF in_color,
-				unsigned int in_size) : name{ in_name }, type{ in_type },
-				color{ in_color }, size{ in_size } {};
+				unsigned int in_size) : name(in_name), type(in_type), color(in_color),
+				size(in_size), render_pointer(nullptr) {};
+
+			LEGEND(std::string in_name, std::string in_type, COLORREF in_color,
+				unsigned int in_size, RenderObjects *render_ptr);
+
+			LEGEND(LEGEND& legend)
+			{
+				name = legend.name;
+				type = legend.type;
+				color = legend.color;
+				size = legend.size;
+				render_pointer = legend.render_pointer;
+				ownership_render_pointer = legend.ownership_render_pointer;
+				legend.ownership_render_pointer = false;
+			}
+
+			~LEGEND();
 
 			std::string name;
 			std::string type;
 			COLORREF color;
 			unsigned int size;
+			RenderObjects *render_pointer;
+
+			bool ownership_render_pointer;
 		};
 
 		std::string xlabel;
@@ -538,6 +505,43 @@ namespace cpplot {
 
 		bool legend_state;
 	};
+
+	Axis::LEGEND::LEGEND(std::string in_name, std::string in_type, 
+		COLORREF in_color, unsigned int in_size, RenderObjects *render_ptr) :
+		name(in_name), type(in_type), color(in_color), size(in_size),
+		ownership_render_pointer(false)
+	{
+		if (render_ptr)
+		{
+			render_pointer = render_ptr;
+			return;
+		}
+		ownership_render_pointer = true;
+
+		if (type == "scatter")
+		{
+			render_pointer = new RenderScatterPoints();
+		}
+		else if (type == "line")
+		{
+			render_pointer = new RenderLinesFull();
+		}
+		else
+		{
+			printf("Warning: Unrecognized type for legend selected! Line pointer "
+				"initialized!");
+
+			render_pointer = new RenderLinesFull();
+		}
+	};
+
+	Axis::LEGEND::~LEGEND()
+	{
+		if (ownership_render_pointer)
+		{
+			delete render_pointer;
+		}
+	}
 
 	void Axis::tick_value_map(double diff, double& y_tick_period_adj, 
 		double& y_value_period_adj)
@@ -612,10 +616,6 @@ namespace cpplot {
 		range, TEXTMETRIC textMetric, RenderAxis *render)
 	{
 		static unsigned int call_counter = 0;
-
-		/* *********************************
-		// Y axis ticks and values rendering
-		********************************* */
 
 		unsigned int stick = (unsigned int)(((rect.right - rect.left) -
 			2.0 * textMetric.tmHeight) / 3.0);
@@ -989,8 +989,7 @@ namespace cpplot {
 				+ current_offset);
 			if (it->type == "scatter")
 			{
-				Ellipse(hdc, point_pos_x - 1, point_pos_y - 1, point_pos_x + 1,
-					point_pos_y + 1);
+				(it->render_pointer)->renderLegend(hdc, point_pos_x, point_pos_y);
 			}
 			else if (it->type == "line")
 			{
@@ -1131,6 +1130,12 @@ namespace cpplot {
 		if (title.empty()) { return 0.0; }
 
 		return text_height * TITLE_RATIO;
+	}
+
+	void Axis::set_legend(std::string name, std::string type, COLORREF color,
+		unsigned int size, RenderObjects *render_ptr)
+	{
+		legend.emplace_back(name, type, color, size, render_ptr);
 	}
 
 	void Axis::set_legend(std::string name, std::string type, COLORREF color,

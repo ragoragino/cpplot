@@ -1,12 +1,15 @@
 #include "Header.h"
 #include "Window.h"
 #include "Bitmap.h"
+#include "Render.h"
 
 /*
 TODO:
 - exceptions
 - finish assymetric Figure constructor
 - check for data
+- RenderObjects to Axis
+- simplify format structure in Ticks
 */
 
 int InitializeWindow(int width, int height);
@@ -29,16 +32,18 @@ namespace cpplot
 		void plot(const std::vector<double>& x, const std::vector<double>& y, 
 			std::string name = "", std::string type = "line", unsigned int width = 1,
 			COLORREF color = WHITE, const std::vector<unsigned int>& position =
-			std::vector<unsigned int>{});
+			std::vector<unsigned int>{}, RenderObjects *render_ptr = nullptr);
 
 		void plot(const std::vector<double>& y, std::string name = "", std::string
 			type = "line", unsigned int width = 1, COLORREF color = WHITE, 
-			const std::vector<unsigned int>& position = std::vector<unsigned int>{});
+			const std::vector<unsigned int>& position = std::vector<unsigned int>{},
+			RenderObjects *render_ptr = nullptr);
 
 		void fplot(double(*func)(double x), double from, double to,
 			std::string name = "", std::string type = "line", 
 			unsigned int width = 1, COLORREF color = WHITE,
-			const std::vector<unsigned int>& position = std::vector<unsigned int>{});
+			const std::vector<unsigned int>& position = std::vector<unsigned int>{},
+			RenderObjects *render_ptr = nullptr);
 
 		void hist(const std::vector<double>& data, int bins, std::vector<double> range = {}, 
 			std::string name = "", unsigned int size = 1.0, COLORREF color = BLUE, 
@@ -158,7 +163,7 @@ namespace cpplot
 
 	inline void Figure::plot(const std::vector<double>& x, const std::vector<double>& y, 
 		std::string name, std::string type, unsigned int width, COLORREF color, 
-		const std::vector<unsigned int>& position)
+		const std::vector<unsigned int>& position, RenderObjects *render_ptr)
 	{
 		unsigned int loc_active_window = 0;
 
@@ -167,12 +172,12 @@ namespace cpplot
 		this->plot_check(position, loc_active_window);
 
 		// Send the variables to the selected Window
-		windows[loc_active_window].prepare(x, y, name, type, width, color);
+		windows[loc_active_window].prepare(x, y, name, type, width, color, render_ptr);
 	}
 
 	inline void Figure::plot(const std::vector<double>& y, std::string name,
 		std::string type, unsigned int width, COLORREF color, 
-		const std::vector<unsigned int>& position)
+		const std::vector<unsigned int>& position, RenderObjects *render_ptr)
 	{
 		unsigned int loc_active_window = 0;
 
@@ -181,12 +186,13 @@ namespace cpplot
 		this->plot_check(position, loc_active_window);
 
 		// Send the variables to the selected Window
-		windows[loc_active_window].prepare(y, name, type, width, color);
+		windows[loc_active_window].prepare(y, name, type, width, color, render_ptr);
 	}
 
 	void Figure::fplot(double(*func)(double x), double from, double to, 
 		std::string name, std::string type, unsigned int width, 
-		COLORREF color, const std::vector<unsigned int>& position)
+		COLORREF color, const std::vector<unsigned int>& position,
+		RenderObjects *render_ptr)
 	{
 		static constexpr unsigned int length = 1000;
 		std::vector<double> x(length);
@@ -198,7 +204,7 @@ namespace cpplot
 			y[i] = func(x[i]);
 		}
 
-		this->plot(y, name, type, width, color, position);
+		this->plot(y, name, type, width, color, position, render_ptr);
 	}
 
 	inline void Figure::hist(const std::vector<double>& data, int bins, std::vector<double> range, 

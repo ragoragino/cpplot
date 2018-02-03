@@ -1,6 +1,7 @@
 #pragma once
 #include "Header.h"
 #include "Graph.h"
+#include "Render.h"
 
 namespace cpplot
 {
@@ -20,10 +21,11 @@ namespace cpplot
 
 		void prepare(const std::vector<double>& in_x, const std::vector<double>& in_y,
 			std::string in_name, std::string in_type, unsigned int in_size,
-			COLORREF in_color);
+			COLORREF in_color, RenderObjects *render_ptr);
 
 		void prepare(const std::vector<double>& in_y, std::string in_name,
-			std::string in_type, unsigned int in_size, COLORREF in_color);
+			std::string in_type, unsigned int in_size, COLORREF in_color,
+			RenderObjects *render_ptr);
 
 		void hist(const std::vector<double>& data, int bins, const std::vector<double>& range,
 			std::string name, unsigned int in_size, COLORREF color, bool normed);
@@ -212,7 +214,8 @@ namespace cpplot
 	}
 
 	inline void Window::prepare(const std::vector<double>& in_x, const std::vector<double>& in_y,
-		std::string in_name, std::string in_type, unsigned int in_size, COLORREF in_color)
+		std::string in_name, std::string in_type, unsigned int in_size, COLORREF in_color,
+		RenderObjects *render_ptr)
 	{
 		// Check for number of plotted graphs in the window and resize the buffer if needed
 		if (active_graph >= max_graphs)
@@ -223,30 +226,29 @@ namespace cpplot
 		// Insert adequate Graph pointer 
 		if (in_type == "scatter")
 		{
-			graph[active_graph++] = new Scatter(in_x, in_y, in_size, in_color, xy_range);
+			graph[active_graph++] = new Scatter(in_x, in_y, in_size, in_color, xy_range, render_ptr);
 		}
 		else if (in_type == "line")
 		{
-			graph[active_graph++] = new Line(in_x, in_y, in_size, in_color, xy_range);
+			graph[active_graph++] = new Line(in_x, in_y, in_size, in_color, xy_range, render_ptr);
 		}
 		else
 		{
 			printf("Warning: Unrecognized plot type selected."
 				"Line type is initialized.");
 
-			graph[active_graph++] = new Line(in_x, in_y, in_size, in_color, xy_range);
+			graph[active_graph++] = new Line(in_x, in_y, in_size, in_color, xy_range, render_ptr);
 		}
 
-
 		// Set legend parameters
-		axis->set_legend(in_name, in_type, in_color, in_size);
+		axis->set_legend(in_name, in_type, in_color, in_size, render_ptr);
 
 		// Initialization of the window succedded
 		initialized = true;
 	}
 
 	inline void Window::prepare(const std::vector<double>& in_y, std::string in_name,
-		std::string in_type, unsigned int in_size, COLORREF in_color)
+		std::string in_type, unsigned int in_size, COLORREF in_color, RenderObjects *render_ptr)
 	{
 		// Create points on the x-axis
 		std::vector<double> x(in_y.size());
@@ -264,22 +266,22 @@ namespace cpplot
 		// Insert adequate Graph pointer 
 		if (in_type == "scatter")
 		{
-			graph[active_graph++] = new Scatter(x, in_y, in_size, in_color, xy_range);
+			graph[active_graph++] = new Scatter(x, in_y, in_size, in_color, xy_range, render_ptr);
 		}
 		else if (in_type == "line")
 		{
-			graph[active_graph++] = new Line(x, in_y, in_size, in_color, xy_range);
+			graph[active_graph++] = new Line(x, in_y, in_size, in_color, xy_range, render_ptr);
 		}
 		else
 		{
 			printf("Warning: Unrecognized plot type selected."
 				"Line type is initialized.");
 
-			graph[active_graph++] = new Line(x, in_y, in_size, in_color, xy_range);
+			graph[active_graph++] = new Line(x, in_y, in_size, in_color, xy_range, render_ptr);
 		}
 
 		// Set legend parameters
-		axis->set_legend(in_name, in_type, in_color, in_size);
+		axis->set_legend(in_name, in_type, in_color, in_size, render_ptr);
 
 		// Initialization of the window succedded
 		initialized = true;
