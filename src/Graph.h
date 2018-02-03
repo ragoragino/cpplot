@@ -1,6 +1,7 @@
 #pragma once
 #include "Header.h"
 #include "Constants.h"
+#include "Render.h"
 
 namespace cpplot {
 
@@ -49,7 +50,7 @@ namespace cpplot {
 	inline unsigned int get_int_digits(double x)
 	{
 		unsigned int no_digits = 0;
-		unsigned int int_part = (unsigned int)(abs(x));
+		unsigned int int_part = (unsigned int)(abs(x) + FP_ERROR);
 
 		while (int_part >= 1)
 		{
@@ -58,7 +59,13 @@ namespace cpplot {
 		}
 
 		// In case x is negative, add also - sign
-		if (x < 0)
+		if (x < 0.0)
+		{
+			++no_digits;
+		}
+
+		// In case x is below +/-one, add one for the beginning zero 
+		if (abs(x) + FP_ERROR < 1.0)
 		{
 			++no_digits;
 		}
@@ -276,17 +283,16 @@ namespace cpplot {
 	class Histogram : public Graph
 	{
 	public:
-		Histogram(const std::vector<double>& in_x,
-			const std::vector<double>& bins, unsigned int in_size,
-			COLORREF in_color, bool normed, std::vector<double>& range);
+		Histogram(const std::vector<double>& in_x, const std::vector<double>& bins,
+			unsigned int in_size,COLORREF in_color, bool normed, std::vector<double>& range);
 
-		Histogram(const std::vector<double>& in_x, int bins, 
-			unsigned int in_size, COLORREF in_color, bool normed, 
+		Histogram(const std::vector<double>& in_x, int bins, const std::vector<double>&
+			max_min_range, unsigned int in_size, COLORREF in_color, bool normed,
 			std::vector<double>& range);
 
 		virtual void initialize(const std::vector<double>& in_x,
-			const std::vector<double>& bins, unsigned int in_size,
-			COLORREF in_color, bool normed, std::vector<double>& range);
+			const std::vector<double>& bins, unsigned int in_size, COLORREF in_color, 
+			bool normed, std::vector<double>& range);
 
 		virtual void show(HDC hdc, HWND hwnd, RECT rect,
 			const std::vector<double>& range) const;
@@ -298,23 +304,43 @@ namespace cpplot {
 	};
 
 	Histogram::Histogram(const std::vector<double>& in_x,
-		const std::vector<double>& bins, unsigned int in_size,
-		COLORREF in_color, bool normed, std::vector<double>& range)
+		const std::vector<double>& bins, unsigned int in_size, COLORREF in_color, 
+		bool normed, std::vector<double>& range)
 	{
 		this->initialize(in_x, bins, in_size, in_color, normed, range);
+
+		double max_y = *std::max_element(y.begin(), y.end(),
+			[](const double& a, const double& b)
+		{ return a < b;  });
+
+		// Set x and y range for Window member range
+		range[0] = range[0] < x.front() ? range[0] : x.front();
+		range[1] = range[1] > x.back() ? range[1] : x.back();
+		range[2] = range[2] < 0.0 ? range[2] : 0.0;
+		range[3] = range[3] > max_y ? range[3] : max_y;
 	}
 
 	Histogram::Histogram(const std::vector<double>& in_x,
-		int bins, unsigned int in_size,	COLORREF in_color, 
+		int bins, const std::vector<double>& max_min_range, 
+		unsigned int in_size, COLORREF in_color,
 		bool normed, std::vector<double>& range)
 	{
 		// Find the max of x
-		double min_x = *std::min_element(in_x.begin(), in_x.end(),
-			[](const double& a, const double& b)
-		{ return a < b;  });
-		double max_x = *std::max_element(in_x.begin(), in_x.end(),
-			[](const double& a, const double& b)
-		{ return a < b;  });		
+		double min_x, max_x;
+		if (max_min_range.empty())
+		{
+			min_x = *std::min_element(in_x.begin(), in_x.end(),
+				[](const double& a, const double& b)
+			{ return a < b;  });
+			max_x = *std::max_element(in_x.begin(), in_x.end(),
+				[](const double& a, const double& b)
+			{ return a < b;  });
+		}
+		else
+		{
+			min_x = max_min_range[0];
+			max_x = max_min_range[1];
+		}
 
 		// Fill the positions of bins
 		const double offset = (max_x - min_x) / bins; 
@@ -325,10 +351,19 @@ namespace cpplot {
 		}
 
 		this->initialize(in_x, bin_pos, in_size, in_color, normed, range);
+
+		double max_y = *std::max_element(y.begin(), y.end(),
+			[](const double& a, const double& b)
+		{ return a < b;  });
+
+		range[0] = range[0] < min_x ? range[0] : min_x;
+		range[1] = range[1] > max_x ? range[1] : max_x;
+		range[2] = range[2] < 0.0 ? range[2] : 0.0;
+		range[3] = range[3] > max_y ? range[3] : max_y;
 	}
 
 	void Histogram::initialize(const std::vector<double>& in_x,
-		const std::vector<double>& bins, unsigned int in_size,
+		const std::vector<double>& bins, unsigned int in_size, 
 		COLORREF in_color, bool normed, std::vector<double>& range)
 	{
 		x = in_x;
@@ -337,21 +372,25 @@ namespace cpplot {
 		if (bin_pos.empty()) { bin_pos = bins; }
 		y = std::vector<double>(bin_pos.size() - 1, 0.0);
 
-		// Sort x and find min and max of x
 		std::sort(x.begin(), x.end());
-		double min_x = x.front();
-		double max_x = x.back();
 
 		// Find the count of x values in the bucket
 		std::vector<double>::iterator y_iter = y.begin();
 		std::vector<double>::const_iterator bin_pos_iter = ++bin_pos.begin();
 		std::vector<double>::const_iterator x_iter = x.begin();
+
+		// Find the starting values for x
+		while(*x_iter++ < (*bin_pos_iter - FP_ERROR)) { }
+
+		// Fill the bins
+		double sum_y = 0.0;
 		for (; bin_pos_iter != bin_pos.end(); bin_pos_iter++)
 		{
-			while (*x_iter < (*bin_pos_iter + FP_ERROR))
+			while (*x_iter < (*bin_pos_iter - FP_ERROR))
 			{
-				*y_iter += 1.0;
 				++x_iter;
+				*y_iter += 1.0;
+				sum_y += 1.0;
 
 				if (x_iter == x.end()) { break; }
 			}
@@ -359,25 +398,24 @@ namespace cpplot {
 			++y_iter;
 		}
 
-		// TODO : Normalize
-		if (normed)
+		// In case there are still values in the x equal to the end of the last bin
+		--y_iter;
+		--bin_pos_iter;
+		while (x_iter != x.end() && *x_iter < (*bin_pos_iter + FP_ERROR))
 		{
-
+			*y_iter += 1.0;
+			sum_y += 1.0;
+			++x_iter;
 		}
 
-		// Find the offset from the starting x
-		double max_y = *std::max_element(y.begin(), y.end(),
-			[](const double& a, const double& b)
-		{ return a < b;  });
-		double min_y = *std::min_element(y.begin(), y.end(),
-			[](const double& a, const double& b)
-		{ return a < b;  });
-
-		// Set x and y range for Window member range
-		range[0] = range[0] < min_x ? range[0] : min_x;
-		range[1] = range[1] > max_x ? range[1] : max_x;
-		range[2] = range[2] < 0.0 ? range[2] : 0.0;
-		range[3] = range[3] > max_y ? range[3] : max_y;
+		// Normalize by dividing by number of observations times bin width
+		if (normed)
+		{
+			for (int i = 0; i != y.size(); ++i)
+			{
+				y[i] /= sum_y * (bin_pos[i + 1] - bin_pos[i]);
+			}
+		}
 	}
 
 	void Histogram::show(HDC hdc, HWND hwnd, RECT rect,
@@ -432,11 +470,8 @@ namespace cpplot {
 		void show_ticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
 			std::vector<double> range, HFONT font); // range by value!
 
-		void show_xticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
-			std::vector<double> range, TEXTMETRIC textMetric);
-
-		void show_yticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
-			std::vector<double> range, TEXTMETRIC textMetric);
+		void show_ticks_internal(HDC hdc, HWND hwnd, RECT rect,	std::vector<double>
+			range, TEXTMETRIC textMetric, RenderAxis *render);
 
 		void tick_value_map(double diff, double& y_tick_period_adj,
 			double& y_value_period_adj);
@@ -573,87 +608,8 @@ namespace cpplot {
 		}
 	}
 
-	void Axis::show_xticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
-		std::vector<double> range, TEXTMETRIC textMetric)
-	{
-		/* *********************************
-		// X axis ticks and values rendering
-		********************************* */
-
-		// Set length of axis ticks
-		unsigned int x_stick = (unsigned int)(((x_rect.bottom - x_rect.top) -
-			2.0 * textMetric.tmHeight) / 3.0);
-
-		double x_factor = 0.0;
-		double x_diff = range[1] - range[0];
-		unsigned int x_op_sign = 0; // nothing, mult or div
-
-		// Obtain the appropriate steps for ticks and values
-		double x_value_period, x_tick_period;
-		this->tick_value_map(x_diff, x_tick_period, x_value_period);
-
-		// Find starting values for the first tick and value
-		int x_value_divisor = (int)ceil(range[0] / x_value_period);
-		int x_tick_divisor = (int)ceil(range[0] / x_tick_period);
-
-		double x_value = x_value_divisor * x_value_period;
-		double x_tick = x_tick_divisor * x_tick_period;
-
-		// Pre-compute variables
-		double win_length_x = x_rect.right - x_rect.left;
-		double length_x = range[1] - range[0];
-
-		unsigned int x_coord, y_coord = x_rect.top;
-
-		// Render ticks
-		while (x_tick < range[1])
-		{
-			x_coord = x_rect.left +
-				(unsigned int)round((x_tick - range[0]) * win_length_x / length_x);
-
-			MoveToEx(hdc, x_coord, y_coord, NULL);
-			LineTo(hdc, x_coord, y_coord + x_stick);
-
-			x_tick += x_tick_period;
-		}
-
-		// Render values
-		y_coord += TICK_TEXT_FACTOR * x_stick;
-		std::wstring x_text;
-
-		// Test needed due to correct rendering of the notation of the number
-		if (x_op_sign == 0 || x_op_sign == 2)
-		{
-			while (x_value < range[1])
-			{
-				x_coord = x_rect.left +
-					(unsigned int)round((x_value - range[0]) * win_length_x / length_x);
-
-				x_text = std::to_wstring((int)x_value);
-				TextOut(hdc, x_coord, y_coord, x_text.c_str(), x_text.size());
-
-				x_value += x_value_period;
-			}
-		}
-		else
-		{
-			while (x_value < range[1])
-			{
-				x_coord = x_rect.left +
-					(unsigned int)round((x_value - range[0]) * win_length_x / length_x);
-
-				x_text = std::to_wstring(x_value);
-				TextOut(hdc, x_coord, y_coord, x_text.c_str(), x_text.size());
-
-				x_value += x_value_period;
-			}
-		}
-
-	}
-
-
-	void Axis::show_yticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
-		std::vector<double> range, TEXTMETRIC textMetric)
+	void Axis::show_ticks_internal(HDC hdc, HWND hwnd, RECT rect, std::vector<double>
+		range, TEXTMETRIC textMetric, RenderAxis *render)
 	{
 		static unsigned int call_counter = 0;
 
@@ -661,15 +617,15 @@ namespace cpplot {
 		// Y axis ticks and values rendering
 		********************************* */
 
-		unsigned int y_stick = (unsigned int)(((y_rect.right - y_rect.left) -
+		unsigned int stick = (unsigned int)(((rect.right - rect.left) -
 			2.0 * textMetric.tmHeight) / 3.0);
 
-		double y_factor = 0.0;
-		double y_diff = range[3] - range[2];
+		double factor = 0.0;
+		double diff = range[1] - range[0];
 
 		// Automatic scientific notation
-		unsigned int y_value_digits = 0; // overall number of digits
-		unsigned int y_value_int_digits = 0; // number of integral digits
+		unsigned int value_digits = 0; // overall number of digits
+		unsigned int value_int_digits = 0; // number of integral digits
 		unsigned int exp_value_capacity = 0; // how many values are expected
 		bool scientific = 0; // whether values will be rendered in the scientific notation
 
@@ -677,115 +633,113 @@ namespace cpplot {
 		// should extract a certain value and keep only the rest in the rendering
 		// of the axis -> e.g. when range is from 100.000001 to 100.000002, then
 		// plot 0.000001 and 0.000002 in the scientific notation and add 100 to the label
-		if (y_diff <= pow(10.0, -MIN_RANGE_DIFF))
+		if (diff <= pow(10.0, -MIN_RANGE_DIFF))
 		{
 			scientific = 1;
 
 			// Add-on that is going to be extracted and added to the label
 			// Ranges need to be internally changed -> that is the reason why
 			// range vector needs to be passed by value!
-			int add_on = (int)range[2];
-			range[2] = range[2] - add_on;
-			range[3] = range[3] - add_on;
+			int add_on = (int)range[0];
+			range[0] = range[0] - add_on;
+			range[1] = range[1] - add_on;
 			if (call_counter++ == 0)
 			{
 				ylabel += " [ " + std::to_string(add_on) + "+ ]";
 			}
 
 			// 6 is a constant because basic notation is: 
-			// e.g. (+/-)1.(SCIENTIFIC_FRAC_DIGITS)e(+/-)10
-			y_value_digits = 6 + SCIENTIFIC_FRAC_DIGITS;
+			// e.g. (+/-)x.(SCIENTIFIC_FRAC_DIGITS)e(+/-)10
+			value_digits = 6 + SCIENTIFIC_FRAC_DIGITS;
 
 			// In case of negative number, also increase number of digits
-			if (range[2] < 0)
+			if (range[0] < 0)
 			{
-				++y_value_digits;
+				++value_digits;
 			}
 		}
-		else if (abs(range[3]) > MAX_RANGE_VALUE)
+		else if (abs(range[1]) > MAX_RANGE_VALUE)
 		{
 			scientific = 1;
 
 			// 6 is a constant because basic notation is: 
 			// e.g. (+/-)1.(SCIENTIFIC_FRAC_DIGITS)e(+/-)10
-			y_value_digits = 6 + SCIENTIFIC_FRAC_DIGITS;
+			value_digits = 6 + SCIENTIFIC_FRAC_DIGITS;
 
 			// In case of negative number, also increase number of digits
-			if (range[2] < 0)
+			if (range[0] < 0)
 			{
-				++y_value_digits;
+				++value_digits;
 			}
 		}
 
 		// Obtain the appropriate steps for ticks and values
-		double y_value_period, y_tick_period;
-		this->tick_value_map(y_diff, y_tick_period, y_value_period);
+		double value_period, tick_period;
+		this->tick_value_map(diff, tick_period, value_period);
 
 		// Find the starting values for the first tick and value
-		int y_value_divisor = (int)ceil(range[2] / y_value_period);
-		int y_tick_divisor = (int)ceil(range[2] / y_tick_period);
+		int value_divisor = (int)ceil(range[0] / value_period);
+		int tick_divisor = (int)ceil(range[0] / tick_period);
 
-		double y_value = y_value_divisor * y_value_period;
-		double y_tick = y_tick_divisor * y_tick_period;
+		double value = value_divisor * value_period;
+		double tick = tick_divisor * tick_period;
 
 		// Pre-compute variables
-		double win_length_y = y_rect.bottom - y_rect.top;
-		double length_y = range[3] - range[2];
-		unsigned int x_coord = y_rect.right;
+		double win_length = rect.bottom - rect.top;
+		double length = range[1] - range[0];
+		unsigned int x_coord = rect.right;
 		unsigned int y_coord;
 
 		// Render ticks
-		while (y_tick < range[3])
+		while (tick < range[1])
 		{
-			y_coord = y_rect.bottom -
-				(unsigned int)round((y_tick - range[2]) * win_length_y / length_y);
+			y_coord = rect.bottom -
+				(unsigned int)round((tick - range[0]) * win_length / length);
 
-			MoveToEx(hdc, x_coord, y_coord, NULL);
-			LineTo(hdc, x_coord - y_stick, y_coord);
+			render->render_tick(hdc, x_coord, y_coord, stick);
 
-			y_tick += y_tick_period;
+			tick += tick_period;
 		}
 
-		x_coord -= (unsigned int)(TICK_TEXT_FACTOR * y_stick);
+		x_coord -= (unsigned int)(TICK_TEXT_FACTOR * stick);
 		std::wstring y_text;
-
-
+		
 		// If the values do not classify as scientific, find the number of integral
 		// and fractional digits -> e.g. 100.01 = 3 integral and 2 fractional
 		if (!scientific)
 		{
-			double y_value_c = y_value;
+			double value_c = value;
 			unsigned int current_digits = 0, current_int_digits = 0;
-			while (y_value_c <= range[3])
+			while (value_c <= range[1])
 			{
-				current_int_digits = get_int_digits(y_value_c);
+				current_int_digits = get_int_digits(value_c);
 				current_digits = current_int_digits +
-					get_frac_digits(y_value_c, MIN_RANGE_DIFF + 1);
+					get_frac_digits(value_c, MIN_RANGE_DIFF + 1);
 
-				if (y_value_digits < current_digits)
+				if (value_digits < current_digits)
 				{
-					y_value_digits = current_digits;
-					y_value_int_digits = current_int_digits;
+					value_digits = current_digits;
+					value_int_digits = current_int_digits;
 				}
 
-				y_value_c += y_value_period;
+				value_c += value_period;
 				++exp_value_capacity;
 			}
 		}
 		else
 		{
-			double y_value_c = y_value;
-			while (y_value_c <= range[3])
+			double value_c = value;
+			while (value_c <= range[1])
 			{
-				y_value_c += y_value_period;
+				value_c += value_period;
 				++exp_value_capacity;
 			}
 		}
 
 		// Find correct text length and max capacity of the rectangle
 		unsigned int av_value_length = AXIS_VALUE_SPACE +
-			y_value_digits * textMetric.tmAveCharWidth;
-		unsigned int max_value_capacity = (y_rect.bottom - y_rect.top) / av_value_length;
+			value_digits * textMetric.tmAveCharWidth;
+		unsigned int max_value_capacity = (rect.bottom - rect.top) / av_value_length;
 
 		// If expected space is higher than maximal space, halve the expectations 
 		double halving = 2.0;
@@ -798,28 +752,29 @@ namespace cpplot {
 			}
 
 			exp_value_capacity = (unsigned int)ceil(exp_value_capacity / halving);
-			y_value_period *= halving;
+			value_period *= halving;
 		}
 
 		// Make proper format for the text rendering via snprintf
 		// char *format = "% int . frac f" or scientific notation
-		char *sbuffer = new char[y_value_digits + 1];
-		wchar_t *wbuffer = new wchar_t[y_value_digits + 1];
+		char *sbuffer = new char[value_digits + 1];
+		wchar_t *wbuffer = new wchar_t[value_digits + 1];
 
 		char format[6];
 		if (!scientific)
 		{
-			unsigned int y_value_frac_digits = y_value_digits - y_value_int_digits;
-			if (y_value_frac_digits)
+			unsigned int value_frac_digits = value_digits - value_int_digits;
+						
+			if (value_frac_digits)
 			{
 				// minus one for the dot in case the number has fractional digits
-				--y_value_frac_digits;
+				--value_frac_digits;
 			}
 
 			format[0] = '%';
-			snprintf(&format[1], 2, "%u", y_value_int_digits);
+			snprintf(&format[1], 2, "%u", value_int_digits);
 			format[2] = '.';
-			snprintf(&format[3], 2, "%u", y_value_frac_digits);
+			snprintf(&format[3], 2, "%u", value_frac_digits);
 			format[4] = 'f';
 			format[5] = '\0';
 		}
@@ -834,18 +789,18 @@ namespace cpplot {
 		}
 
 		// Render the text
-		while (y_value < range[3])
+		while (value < range[1])
 		{
-			y_coord = y_rect.bottom -
-				(unsigned int)round((y_value - range[2]) * win_length_y / length_y);
+			y_coord = rect.bottom -
+				(unsigned int)round((value - range[0]) * win_length / length);
 
 			// + 1 in y_value_digits for null-termination
-			snprintf(sbuffer, y_value_digits + 1, format, y_value);
+			snprintf(sbuffer, value_digits + 1, format, value);
 
-			MultiByteToWideChar(CP_UTF8, 0, sbuffer, -1, wbuffer, y_value_digits + 1);
-			TextOut(hdc, x_coord, y_coord, wbuffer, y_value_digits);
+			MultiByteToWideChar(CP_UTF8, 0, sbuffer, -1, wbuffer, value_digits + 1);
+			render->render_text(hdc, x_coord, y_coord, wbuffer, value_digits);
 
-			y_value += y_value_period;
+			value += value_period;
 		}
 
 		// Clean allocated buffers 
@@ -867,8 +822,11 @@ namespace cpplot {
 		TEXTMETRIC textMetric;
 		GetTextMetrics(hdc, &textMetric);
 
-		// Render ticks on the x axis
-		this->show_xticks(hdc, hwnd, x_rect, y_rect, range, textMetric);
+		// Render ticks on the x axis -> flip the rendering rectangle
+		RenderAxisX renderX = RenderAxisX(x_rect);
+		std::vector<double> x_range{ range[0], range[1] };
+		RECT x_rect_flipped = {x_rect.top, x_rect.left, x_rect.bottom, x_rect.right};
+		this->show_ticks_internal(hdc, hwnd, x_rect_flipped, x_range, textMetric, &renderX);
 
 		// Set bottom and center text alignment
 		SetTextAlign(hdc, TA_CENTER | TA_BOTTOM);
@@ -881,7 +839,9 @@ namespace cpplot {
 		HFONT h_prev_font = (HFONT)SelectObject(hdc, (HGDIOBJ)(HFONT)(lfont));
 
 		// Render ticks on the y axis
-		this->show_yticks(hdc, hwnd, x_rect, y_rect, range, textMetric);
+		RenderAxisY renderY = RenderAxisY();
+		std::vector<double> y_range{ range[2], range[3] };
+		this->show_ticks_internal(hdc, hwnd, y_rect, y_range, textMetric, &renderY);
 
 		// Set text alignment and font that was in place before rendering axis attributes
 		SetTextAlign(hdc, prev_text_align);
@@ -902,7 +862,7 @@ namespace cpplot {
 		// Write the label of x axis
 		unsigned int x_coord_xlabel = (unsigned int)((rect.right + rect.left) * 0.5);
 		unsigned int y_coord_xlabel = rect.bottom;
-		wchar_t * wide_xlabel = new wchar_t[xlabel.size() + 1];
+		wchar_t *wide_xlabel = new wchar_t[xlabel.size() + 1];
 		MultiByteToWideChar(CP_UTF8, 0, xlabel.c_str(), -1, wide_xlabel, xlabel.size() + 1);
 		TextOut(hdc, x_coord_xlabel, y_coord_xlabel, wide_xlabel, xlabel.size());
 

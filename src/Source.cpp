@@ -40,16 +40,16 @@ int main()
 	// Iterate over individual graphs
 	for (unsigned int i = 0; i != 2; ++i)
 	{
-		// plt.plot(x, "Line A", "line", 1, BLUE, { i, 0 });
+		// plt.plot(x, y, "Line A", "line", 1, BLUE, { i, 0 });
 		// plt.plot(x, y, "Scatter B", "scatter", 3, RED, { i, 0 });
 		// plt.plot(x, z, "Scatter C", "scatter", 3, YELLOW, { i, 0 });
 		// plt.fplot(sin, 0,  2.0 * M_PI, "Sine", "line", 1, PINK, { i, 0 });
-		plt.hist(y, 100, "Histogram", 1, GREEN, false, { i, 0 });
+		plt.hist(y, 100, std::vector<double>{-2.0, 2.0}, "Histogram", 1, GREEN, true, { i, 0 });
 		plt.xlabel("Index");
 		plt.ylabel("Value");
 		plt.title("Graph");
 	}
-	// plt.legend();
+	plt.legend();
 	plt.save("PLOT", "png");
 	// plt.show();
 	

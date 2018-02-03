@@ -7,7 +7,6 @@ TODO:
 - exceptions
 - finish assymetric Figure constructor
 - check for data
-- normed histogram
 */
 
 int InitializeWindow(int width, int height);
@@ -41,13 +40,15 @@ namespace cpplot
 			unsigned int width = 1, COLORREF color = WHITE,
 			const std::vector<unsigned int>& position = std::vector<unsigned int>{});
 
-		void hist(const std::vector<double>& data, int bins, std::string name = "",
-			unsigned int size = 1.0, COLORREF color = BLUE, bool normed = false,
-			const std::vector<unsigned int>& position = std::vector<unsigned int>{});
+		void hist(const std::vector<double>& data, int bins, std::vector<double> range = {}, 
+			std::string name = "", unsigned int size = 1.0, COLORREF color = BLUE, 
+			bool normed = false, const std::vector<unsigned int>& position = 
+			std::vector<unsigned int>{});
 
 		void hist(const std::vector<double>& data, const std::vector<double>& bins,
-			std::string name = "", unsigned int size = 1.0, COLORREF color = BLUE, bool normed = false,
-			const std::vector<unsigned int>& position = std::vector<unsigned int>{});
+			std::string name = "", unsigned int size = 1.0, COLORREF color = BLUE, 
+			bool normed = false,	const std::vector<unsigned int>& 
+			position = std::vector<unsigned int>{});
 
 		void plot_check(const std::vector<unsigned int>& position, unsigned int& local_window);
 
@@ -200,8 +201,9 @@ namespace cpplot
 		this->plot(y, name, type, width, color, position);
 	}
 
-	inline void Figure::hist(const std::vector<double>& data, int bins, std::string name,
-		unsigned int size, COLORREF color, bool normed, const std::vector<unsigned int>& position)
+	inline void Figure::hist(const std::vector<double>& data, int bins, std::vector<double> range, 
+		std::string name, unsigned int size, COLORREF color, bool normed, 
+		const std::vector<unsigned int>& position)
 	{
 		unsigned int loc_active_window = 0;
 
@@ -210,7 +212,7 @@ namespace cpplot
 		this->plot_check(position, loc_active_window);
 
 		// Send the variables to the selected Window
-		windows[loc_active_window].hist(data, bins, name, size, color, normed);
+		windows[loc_active_window].hist(data, bins, range, name, size, color, normed);
 	}
 	
 	inline void Figure::hist(const std::vector<double>& data, const std::vector<double>& bins,
@@ -265,6 +267,13 @@ namespace cpplot
 
 	inline void Figure::paint(HDC hdc, HWND hwnd, RECT client_area)
 	{
+		// In case the window is distorted (e.g. minimized), do not paint
+		if (client_area.right - client_area.left <= 0 ||
+			client_area.bottom - client_area.top <= 0)
+		{
+			return;
+		}
+
 		// Select default font
 		SelectObject(hdc, font);
 

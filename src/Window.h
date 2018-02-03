@@ -25,12 +25,11 @@ namespace cpplot
 		void prepare(const std::vector<double>& in_y, std::string in_name,
 			std::string in_type, unsigned int in_size, COLORREF in_color);
 
-		void hist(const std::vector<double>& data, int bins, std::string name,
-			unsigned int in_size, COLORREF color, bool normed);
+		void hist(const std::vector<double>& data, int bins, const std::vector<double>& range,
+			std::string name, unsigned int in_size, COLORREF color, bool normed);
 
 		void hist(const std::vector<double>& data, const std::vector<double>& bins,
-			std::string name, unsigned int in_size, COLORREF color, 
-			bool normed);
+			std::string name, unsigned int in_size, COLORREF color, bool normed);
 
 		void show(HDC hdc, HWND hwnd, RECT rect, HFONT font);
 
@@ -286,7 +285,8 @@ namespace cpplot
 		initialized = true;
 	}
 
-	void Window::hist(const std::vector<double>& data, int bins, std::string name,
+	void Window::hist(const std::vector<double>& data, int bins, 
+		const std::vector<double>& range, std::string name,
 		unsigned int in_size, COLORREF color, bool normed)
 	{
 		// Check for number of plotted graphs in the window and resize the buffer if needed
@@ -296,7 +296,8 @@ namespace cpplot
 		}
 
 		// Insert adequate Graph pointer 
-		graph[active_graph++] = new Histogram(data, bins, in_size, color, normed, xy_range);
+		graph[active_graph++] = 
+			new Histogram(data, bins, range, in_size, color, normed, xy_range);
 
 		// Set legend parameters
 		axis->set_legend(name, "hist", color, in_size);
@@ -305,7 +306,7 @@ namespace cpplot
 		initialized = true;
 	}
 
-	void Window::hist(const std::vector<double>& data, const std::vector<double>& bins,
+	void Window::hist(const std::vector<double>& data, const std::vector<double>& bins, 
 		std::string name, unsigned int in_size, COLORREF color, bool normed)
 	{
 		// Check for number of plotted graphs in the window and resize the buffer if needed
@@ -315,7 +316,8 @@ namespace cpplot
 		}
 
 		// Insert adequate Graph pointer 
-		graph[active_graph++] = new Histogram(data, bins, in_size, color, normed, xy_range);
+		graph[active_graph++] = 
+			new Histogram(data, bins, in_size, color, normed, xy_range);
 
 		// Set legend parameters
 		axis->set_legend(name, "hist", color, in_size);

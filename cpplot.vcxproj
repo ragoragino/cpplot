@@ -148,6 +148,7 @@
     <ClInclude Include="src\Figure.h" />
     <ClInclude Include="src\Graph.h" />
     <ClInclude Include="src\Header.h" />
+    <ClInclude Include="src\Render.h" />
     <ClInclude Include="src\Window.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
