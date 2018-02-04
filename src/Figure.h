@@ -8,8 +8,7 @@ TODO:
 - exceptions
 - finish assymetric Figure constructor
 - check for data
-- RenderObjects to Axis
-- simplify format structure in Ticks
+- simplify structure in Ticks (problem with label) -> individual length of the number
 */
 
 int InitializeWindow(int width, int height);
@@ -290,22 +289,20 @@ namespace cpplot
 		double width_ratio = (double)(client_area.right - client_area.left) / (double)win_width;
 		double height_ratio = (double)(client_area.bottom - client_area.top) / (double)win_height;
 
+		std::vector<unsigned int> width_copy(width.size());
+		std::vector<unsigned int> height_copy(height.size());
 		for (int i = 0; i != width.size(); ++i)
 		{
-			width[i] = (int)(width[i] * width_ratio);
+			width_copy[i] = (int)(width[i] * width_ratio);
 		}
 
 		for (int i = 0; i != height.size(); ++i)
 		{
-			height[i] = (int)(height[i] * height_ratio);
+			height_copy[i] = (int)(height[i] * height_ratio);
 		}
 
-		win_width = client_area.right - client_area.left;
-		win_height = client_area.bottom - client_area.top;
-
 		// Plot the individual windows
-		unsigned int pos_x;
-		unsigned int pos_y;
+		int pos_x, pos_y;
 		RECT rect;
 
 		for (unsigned int i = 0; i != (x_dim * y_dim); ++i)
@@ -320,10 +317,10 @@ namespace cpplot
 			pos_y = i - pos_x * y_dim;
 
 			// Compute the RECT of that position
-			rect.top = cumulative_sum(height, pos_y);
-			rect.bottom = cumulative_sum(height, pos_y + 1);
-			rect.left = cumulative_sum(width, pos_x);
-			rect.right = cumulative_sum(width, pos_x + 1);
+			rect.top = cumulative_sum(height_copy, pos_y);
+			rect.bottom = cumulative_sum(height_copy, pos_y + 1);
+			rect.left = cumulative_sum(width_copy, pos_x);
+			rect.right = cumulative_sum(width_copy, pos_x + 1);
 
 			// Generate and show contents of individual windows
 			windows[i].show(hdc, hwnd, rect, font);

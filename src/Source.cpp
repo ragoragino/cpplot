@@ -6,7 +6,7 @@
 int main()
 {	
 	// Create data
-	unsigned int length = 100000;
+	unsigned int length = 1000;
 	std::vector<double> x(length);
 	std::vector<double> y(length);
 	std::vector<double> z(length);
@@ -17,10 +17,10 @@ int main()
 
 	for (unsigned int i = 0; i != length; ++i)
 	{
-		//x[i] = 10.0 * (double)rand() / (double)RAND_MAX;
-		//y[i] = 10.0 * (double)rand() / (double)RAND_MAX;
-		//z[i] = 10.0 * (double)rand() / (double)RAND_MAX;
-		y[i] = distribution(generator);
+		x[i] = (double)rand() / (double)RAND_MAX;
+		y[i] = (double)rand() / (double)RAND_MAX;
+		z[i] = (double)rand() / (double)RAND_MAX;
+		// y[i] = 10.0 * distribution(generator);
 	}
 	/*
 	cpplot::Figure plt(1000, 1000, RGB(100, 0, 200));
@@ -38,14 +38,15 @@ int main()
 	
 
 	// Iterate over individual graphs
-	RenderObjects *rptr = &RenderScatterSquares();
+	RenderObjects *rptr = &RenderLinesDotted(10);
 	for (unsigned int i = 0; i != 2; ++i)
 	{
-		// plt.plot(x, y, "Line A", "line", 1, BLUE, { i, 0 });
-		// plt.plot(x, y, "Scatter B", "scatter", 3, RED, { i, 0 }, rptr);
-		// plt.plot(x, z, "Scatter C", "scatter", 3, YELLOW, { i, 0 }, rptr);
+		plt.plot(x, y, "Line A", "line", 1, RED, { i, 0 });
+		plt.plot(x, z, "Line B", "line", 1, YELLOW, { i, 0 });
+		plt.plot(x, y, "Scatter A", "scatter", 5, RED, { i, 0 });
+		plt.plot(x, z, "Scatter B", "scatter", 5, YELLOW, { i, 0 });
 		// plt.fplot(sin, 0,  2.0 * M_PI, "Sine", "line", 1, PINK, { i, 0 });
-		plt.hist(y, 100, std::vector<double>{-2.0, 2.0}, "Histogram", 1, GREEN, true, { i, 0 });
+		// plt.hist(y, 100, std::vector<double>{-10.0, 10.0}, "Histogram", 1, GREEN, true, { i, 0 });
 		plt.xlabel("Index");
 		plt.ylabel("Value");
 		plt.title("Graph");

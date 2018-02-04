@@ -82,36 +82,34 @@ class RenderObjects
 {
 public:
 	virtual void renderPoints(HDC hdc, const std::vector<double>& x, 
-		const std::vector<double>& y, RECT rect, const std::vector<double>& range,
-		COLORREF color, unsigned int size) {};
+		const std::vector<double>& y, RECT rect, const std::vector<double>& range) {};
 
 	virtual void renderLines(HDC hdc, const std::map<double, double>& data, RECT rect,
-		const std::vector<double>& range, COLORREF color, unsigned int size) {};
+		const std::vector<double>& range) {};
 
-	virtual void renderLegend(HDC hdc, unsigned int x, unsigned int y) {};
+	virtual void renderLegend(HDC hdc, RECT pos) {};
 };
 
 class RenderScatter : public RenderObjects
 {
 public:
 	virtual void renderPoints(HDC hdc, const std::vector<double>& x, 
-		const std::vector<double>& y,
-		RECT rect, const std::vector<double>& range, COLORREF color, unsigned int size) {};
+		const std::vector<double>& y, RECT rect, const std::vector<double>& range) {};
 
-	virtual void renderLegend(HDC hdc, unsigned int x, unsigned int y) {};
+	virtual void renderLegend(HDC hdc, RECT pos) {};
 };
 
 class RenderScatterPoints : public RenderScatter
 {
 public:
-	virtual void renderPoints(HDC hdc, const std::vector<double>& x, const std::vector<double>& y,
-		RECT rect, const std::vector<double>& range, COLORREF color, unsigned int size);
+	virtual void renderPoints(HDC hdc, const std::vector<double>& x, 
+		const std::vector<double>& y, RECT rect, const std::vector<double>& range);
 
-	virtual void renderLegend(HDC hdc, unsigned int x, unsigned int y);
+	virtual void renderLegend(HDC hdc, RECT pos);
 };
 
-void RenderScatterPoints::renderPoints(HDC hdc, const std::vector<double>& x, const std::vector<double>& y,
-	RECT rect, const std::vector<double>& range, COLORREF color, unsigned int size)
+void RenderScatterPoints::renderPoints(HDC hdc, const std::vector<double>& x,
+	const std::vector<double>& y, RECT rect, const std::vector<double>& range)
 {
 	// Set adjusted min and max values, adjusted for the 
 	// free space before/after the first/last point
@@ -125,49 +123,40 @@ void RenderScatterPoints::renderPoints(HDC hdc, const std::vector<double>& x, co
 	double win_length_y = rect.bottom - rect.top;
 	double length_x = max_x - min_x;
 	double length_y = max_y - min_y;
-	unsigned int x_coord, y_coord;
-
-	// Set appropriate graph properties
-	HPEN hGraphPen = CreatePen(PS_SOLID, size, color);
-	HBRUSH hGraphBrush = CreateSolidBrush(color);
-	HPEN hGraphPreviousPen = (HPEN)SelectObject(hdc, hGraphPen);
-	HBRUSH hGraphPreviousBrush = (HBRUSH)SelectObject(hdc, hGraphBrush);
+	int x_coord, y_coord;
 
 	// Draw the points
-	unsigned int x_size = x.size();
-	for (unsigned int i = 0; i != x_size; ++i)
+	int x_size = x.size();
+	for (int i = 0; i != x_size; ++i)
 	{
 		x_coord = rect.left +
-			(unsigned int)round((x[i] - min_x) * win_length_x / length_x);
+			(int)round((x[i] - min_x) * win_length_x / length_x);
 		y_coord = rect.bottom -
-			(unsigned int)round((y[i] - min_y) * win_length_y / length_y);
+			(int)round((y[i] - min_y) * win_length_y / length_y);
 
 		Ellipse(hdc, x_coord - 1, y_coord - 1, x_coord + 1, y_coord + 1);
 	}
-
-	// Clean graphic objects
-	DeleteObject(hGraphPen);
-	DeleteObject(hGraphBrush);
-
-	// Set previous graphic properties
-	SelectObject(hdc, hGraphPreviousPen);
-	SelectObject(hdc, hGraphPreviousBrush);
 }
 
-void RenderScatterPoints::renderLegend(HDC hdc, unsigned int x, unsigned int y)
+void RenderScatterPoints::renderLegend(HDC hdc, RECT pos)
 {
+	int x = (int)(0.5 * (pos.left + pos.right));
+	int y = (int)(0.5 * (pos.top + pos.bottom));
+
 	Ellipse(hdc, x - 1, y - 1, x + 1, y + 1);
 }
 
 class RenderScatterSquares : public RenderScatter
 {
 public:
-	virtual void renderPoints(HDC hdc, const std::vector<double>& x, const std::vector<double>& y,
-		RECT rect, const std::vector<double>& range, COLORREF color, unsigned int size);
+	virtual void renderPoints(HDC hdc, const std::vector<double>& x, 
+		const std::vector<double>& y, RECT rect, const std::vector<double>& range);
+
+	void renderLegend(HDC hdc, RECT pos);
 };
 
-void RenderScatterSquares::renderPoints(HDC hdc, const std::vector<double>& x, const std::vector<double>& y,
-	RECT rect, const std::vector<double>& range, COLORREF color, unsigned int size)
+void RenderScatterSquares::renderPoints(HDC hdc, const std::vector<double>& x, 
+	const std::vector<double>& y, RECT rect, const std::vector<double>& range)
 {
 	// Set adjusted min and max values, adjusted for the 
 	// free space before/after the first/last point
@@ -181,51 +170,51 @@ void RenderScatterSquares::renderPoints(HDC hdc, const std::vector<double>& x, c
 	double win_length_y = rect.bottom - rect.top;
 	double length_x = max_x - min_x;
 	double length_y = max_y - min_y;
-	unsigned int x_coord, y_coord;
-
-	// Set appropriate graph properties
-	HPEN hGraphPen = CreatePen(PS_SOLID, size, color);
-	HBRUSH hGraphBrush = CreateSolidBrush(color);
-	HPEN hGraphPreviousPen = (HPEN)SelectObject(hdc, hGraphPen);
-	HBRUSH hGraphPreviousBrush = (HBRUSH)SelectObject(hdc, hGraphBrush);
+	int x_coord, y_coord;
 
 	// Draw the points
-	unsigned int x_size = x.size();
+	int x_size = x.size();
 	for (unsigned int i = 0; i != x_size; ++i)
 	{
 		x_coord = rect.left +
-			(unsigned int)round((x[i] - min_x) * win_length_x / length_x);
+			(int)round((x[i] - min_x) * win_length_x / length_x);
 		y_coord = rect.bottom -
-			(unsigned int)round((y[i] - min_y) * win_length_y / length_y);
+			(int)round((y[i] - min_y) * win_length_y / length_y);
 
 		Rectangle(hdc, x_coord - 2, y_coord - 2, x_coord + 2, y_coord + 2);
 	}
+}
 
-	// Clean graphic objects
-	DeleteObject(hGraphPen);
-	DeleteObject(hGraphBrush);
+void RenderScatterSquares::renderLegend(HDC hdc, RECT pos)
+{
+	int begin_x = (int)(pos.left + 0.25 * (pos.right - pos.left));
+	int end_x = (int)(pos.left + 0.75 * (pos.right - pos.left));
+	int begin_y = (int)(pos.top + 0.25 * (pos.bottom - pos.top));
+	int end_y = (int)(pos.top + 0.75 * (pos.bottom - pos.top));
 
-	// Set previous graphic properties
-	SelectObject(hdc, hGraphPreviousPen);
-	SelectObject(hdc, hGraphPreviousBrush);
+	Rectangle(hdc, begin_x, begin_y, end_x, end_y);
 }
 
 class RenderLines : public RenderObjects
 {
 public:
-	virtual void render(HDC hdc, const std::map<double, double>& data, RECT rect,
-		const std::vector<double>& range, COLORREF color, unsigned int size) {};
+	virtual void renderLiness(HDC hdc, const std::map<double, double>& data, RECT rect,
+		const std::vector<double>& range) {};
+
+	virtual void renderLegend(HDC hdc, RECT pos) {};
 };
 
 class RenderLinesFull : public RenderLines
 {
 public:
 	virtual void renderLines(HDC hdc, const std::map<double, double>& data, RECT rect,
-		const std::vector<double>& range, COLORREF color, unsigned int size);
+		const std::vector<double>& range);
+
+	virtual void renderLegend(HDC hdc, RECT pos);
 };
 
 void RenderLinesFull::renderLines(HDC hdc, const std::map<double, double>& data, RECT rect,
-	const std::vector<double>& range, COLORREF color, unsigned int size)
+	const std::vector<double>& range)
 {
 	double min_x = range[0];
 	double max_x = range[1];
@@ -239,29 +228,158 @@ void RenderLinesFull::renderLines(HDC hdc, const std::map<double, double>& data,
 	double length_y = max_y - min_y;
 
 	// Move to the starting point
-	unsigned int x_coord = rect.left +
-		(unsigned int)round((data.begin()->first - min_x) * win_length_x / length_x);
-	unsigned int y_coord = rect.bottom -
-		(unsigned int)round((data.begin()->second - min_y) * win_length_y / length_y);
+	int x_coord = rect.left +
+		(int)round((data.begin()->first - min_x) * win_length_x / length_x);
+	int y_coord = rect.bottom -
+		(int)round((data.begin()->second - min_y) * win_length_y / length_y);
 	MoveToEx(hdc, x_coord, y_coord, NULL);
 
-	// Set appropriate graph properties and draw the lines
-	HPEN hGraphPen = CreatePen(PS_SOLID, size, color);
-	HPEN hGraphPreviousPen = (HPEN)SelectObject(hdc, hGraphPen);
 	for (std::map<double, double>::const_iterator it = data.begin();
 		it != data.end(); ++it)
 	{
 		x_coord = rect.left +
-			(unsigned int)round((it->first - min_x) * win_length_x / length_x);
+			(int)round((it->first - min_x) * win_length_x / length_x);
 		y_coord = rect.bottom -
-			(unsigned int)round((it->second - min_y) * win_length_y / length_y);
+			(int)round((it->second - min_y) * win_length_y / length_y);
 
 		LineTo(hdc, x_coord, y_coord);
 	}
+}
 
-	// Delete graphics objects
-	DeleteObject(hGraphPen);
+void RenderLinesFull::renderLegend(HDC hdc, RECT pos)
+{
+	int begin_x = (int)(pos.left + 0.25 * (pos.right - pos.left));
+	int end_x = (int)(pos.left + 0.75 * (pos.right - pos.left));
+	int y = (int)(0.5 * (pos.top + pos.bottom));
 
-	// Set previous graphic properties
-	SelectObject(hdc, hGraphPreviousPen);
+	MoveToEx(hdc, begin_x, y, NULL);
+	LineTo(hdc, end_x, y);
+}
+
+class RenderLinesDotted : public RenderLines
+{
+public:
+	RenderLinesDotted(int dot_length) : dot_length(dot_length) {};
+
+	virtual void renderLines(HDC hdc, const std::map<double, double>& data, RECT rect,
+		const std::vector<double>& range);
+
+	virtual void renderLegend(HDC hdc, RECT pos);
+
+private:
+	struct Point
+	{
+		Point() : x(0), y(0) {};
+
+		Point(int in_x, int in_y) : x(in_x), y(in_y) {};
+		
+		int x, y;
+	};
+
+	double norm(Point a, Point b)
+	{
+		double distance = (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y);
+
+		return sqrt(distance);
+	};
+
+	Point interpolate(Point a, Point b, double alpha)
+	{
+		Point point;
+		point.x = (int)(a.x * (1.0 - alpha) + b.x * alpha);
+		point.y = (int)(a.y * (1.0 - alpha) + b.y * alpha);
+
+		return point;
+	}
+
+	int dot_length;
+}; 
+
+
+void RenderLinesDotted::renderLines(HDC hdc, const std::map<double, double>& data, RECT rect,
+	const std::vector<double>& range)
+{
+	double min_x = range[0];
+	double max_x = range[1];
+	double min_y = range[2];
+	double max_y = range[3];
+
+	// Pre-compute variables
+	double win_length_x = rect.right - rect.left;
+	double win_length_y = rect.bottom - rect.top;
+	double length_x = max_x - min_x;
+	double length_y = max_y - min_y;
+
+	// Starting point
+	Point start_data, end_data;
+	start_data.x = rect.left +
+		(int)round((data.begin()->first - min_x) * win_length_x / length_x);
+	start_data.y = rect.bottom -
+		(int)round((data.begin()->second - min_y) * win_length_y / length_y);
+
+	double distance; // length of the current line
+	double start_dot_length = 0.0; // current dot start on the current line
+	double end_dot_length = (double)dot_length; // current dot end on the current line
+	Point start_point, end_point; // starting point and ending point of the current line
+
+	// Start the data iterator at the second point
+	std::map<double, double>::const_iterator it = ++data.begin();
+
+	// Render the dotted line
+	for (; it != data.end(); ++it)
+	{
+		end_data.x = rect.left +
+			(int)round((it->first - min_x) * win_length_x / length_x);
+		end_data.y = rect.bottom -
+			(int)round((it->second - min_y) * win_length_y / length_y);
+
+		// Compute the length of the current line
+		distance = norm(start_data, end_data);
+
+		// Render every second dot_length
+		while (end_dot_length <= distance)
+		{
+			start_point = interpolate(start_data, end_data, start_dot_length / distance);
+			end_point = interpolate(start_data, end_data, end_dot_length / distance);
+
+			MoveToEx(hdc, start_point.x, start_point.y, NULL);
+			LineTo(hdc, end_point.x, end_point.y);
+
+			start_dot_length = norm(end_point, start_data) + dot_length;
+			end_dot_length = start_dot_length + dot_length;
+		}
+
+		// In case the we can still paint a part of the current dotted segment,
+		// we divide the segment. In case we cannot, we move to the next segment
+		// with an appropriate offset
+		if (start_dot_length < distance)
+		{
+			start_point = interpolate(start_data, end_data, start_dot_length / distance);
+			end_point = end_data;
+
+			MoveToEx(hdc, start_point.x, start_point.y, NULL);
+			LineTo(hdc, end_point.x, end_point.y);
+
+			end_dot_length = dot_length - (distance - start_dot_length);
+			start_dot_length = 0.0;
+		}
+		else
+		{
+			start_dot_length = start_dot_length - distance;
+			end_dot_length = start_dot_length + dot_length;
+		}
+
+		start_data.x = end_data.x;
+		start_data.y = end_data.y;
+	}
+}
+
+void RenderLinesDotted::renderLegend(HDC hdc, RECT pos)
+{
+	int begin_x = (int)(pos.left + 0.25 * (pos.right - pos.left));
+	int end_x = (int)(pos.left + 0.75 * (pos.right - pos.left));
+	int y = (int)(0.5 * (pos.top + pos.bottom));
+
+	MoveToEx(hdc, begin_x, y, NULL);
+	LineTo(hdc, end_x, y);
 }
