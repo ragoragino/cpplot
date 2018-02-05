@@ -139,9 +139,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\Source.cpp" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="src\Bitmap.h" />
     <ClInclude Include="src\Constants.h" />
     <ClInclude Include="src\example.h" />
@@ -150,6 +147,9 @@
     <ClInclude Include="src\Header.h" />
     <ClInclude Include="src\Render.h" />
     <ClInclude Include="src\Window.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\example4.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

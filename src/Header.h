@@ -3,6 +3,14 @@
 #pragma comment(lib, "Gdi32.lib")
 #pragma comment(lib, "Gdiplus.lib")
 
+#ifndef UNICODE
+#define UNICODE
+#endif
+
+#ifndef _UNICODE
+#define _UNICODE
+#endif
+
 #include <windows.h>
 #include "Gdiplus.h"
 #include "Gdiplusheaders.h" 
@@ -13,8 +21,9 @@
 #include <vector>
 #include <string>
 #include <map>
-#include <iostream>
 #include <algorithm>
 #include <memory>
 
 #include "Constants.h"
+
+#include <iostream>

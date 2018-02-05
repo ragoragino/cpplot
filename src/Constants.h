@@ -1,7 +1,7 @@
 #pragma once
 
 // define floating-point error comparison allowance
-#define FP_ERROR 0.000001
+#define FP_ERROR 0.00000001
 
 // COLORS
 #define BLACK RGB(0, 0, 0)
@@ -19,6 +19,11 @@
 // defines number of Graph objects handled in a single window
 #ifndef MAX_GRAPHS
 #define MAX_GRAPHS 10
+#endif
+
+// defines number of default colors
+#ifndef MAX_COLORS
+#define MAX_COLORS 10
 #endif
 
 // defines adjustment of left, right, up and bottom regions
@@ -62,7 +67,7 @@
 #endif
 
 // free space between graph and legend
-#ifndef GRAP_LEGEND_SPACE
+#ifndef GRAPH_LEGEND_SPACE
 #define GRAPH_LEGEND_SPACE 10
 #endif
 
@@ -86,8 +91,8 @@
 #define TICK_TEXT_FACTOR 2
 #endif
 
-// Minimum difference, under which a shift in the representation
-// of a number in the tick values changes
+// Minimum difference pow(10, MIN_RANGE_DIFF), under which a 
+// shift in the representation of a number in the tick values changes
 // e.g. the for the range of 10.000001 to 10.000002, one
 // considers writing 10 next to thh label and 1e-6 to 2e-6 on the axis ticks
 #ifndef MIN_RANGE_DIFF
@@ -100,7 +105,6 @@
 #endif
 
 // How many digits the fractional part of the scientific notation should have
-// above the basic one, e.g. basic is 5 in 1.5e10
 #ifndef SCIENTIFIC_FRAC_DIGITS
 #define SCIENTIFIC_FRAC_DIGITS 2
 #endif
@@ -108,4 +112,9 @@
 // Maximal size of extension for saving
 #ifndef MAX_EXTENSION_SIZE
 #define MAX_EXTENSION_SIZE 10
+#endif
+
+// Size of the x data of fplot routine
+#ifndef FPLOT_LENGTH
+#define FPLOT_LENGTH 1000
 #endif

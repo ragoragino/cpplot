@@ -6,12 +6,11 @@
 namespace cpplot {
 
 	class Figure;
-	inline unsigned int cumulative_sum(const std::vector<unsigned int>& container, size_t index)
-	{
-		assert(index <= container.size());
 
-		unsigned int cum_sum = 0;
-		for (unsigned int i = 0; i != index; ++i)
+	inline int cumulative_sum(const std::vector<int>& container, size_t index)
+	{
+		int cum_sum = 0;
+		for (int i = 0; i != index; ++i)
 		{
 			cum_sum += container[i];
 		}
@@ -19,20 +18,20 @@ namespace cpplot {
 		return cum_sum;
 	}
 
-	inline unsigned int get_frac_digits(double x, unsigned int precision)
+	inline int get_frac_digits(double x, int precision)
 	{
-		unsigned int no_digits = precision;
-		unsigned int power = (unsigned int)pow(10, precision);
-		unsigned int modulo = 10;
+		int no_digits = precision;
+		int power = (int)pow(10, precision);
+		int modulo = 10;
 
-		unsigned int int_part = (unsigned int)(abs(x));
+		int int_part = (int)(abs(x));
 		double decim_part = abs(x) - int_part;
 
-		unsigned int indicator;
+		int indicator;
 
 		while (modulo <= power)
 		{
-			indicator = (unsigned int)(decim_part * power + FP_ERROR) % modulo;
+			indicator = (int)(decim_part * power + FP_ERROR) % modulo;
 
 			if (indicator > 0)
 			{
@@ -47,10 +46,10 @@ namespace cpplot {
 		return no_digits;
 	}
 
-	inline unsigned int get_int_digits(double x)
+	inline int get_int_digits(double x)
 	{
-		unsigned int no_digits = 0;
-		unsigned int int_part = (unsigned int)(abs(x) + FP_ERROR);
+		int no_digits = 0;
+		int int_part = (int)(abs(x) + FP_ERROR);
 
 		while (int_part >= 1)
 		{
@@ -73,23 +72,26 @@ namespace cpplot {
 		return no_digits;
 	}
 
-	inline void set_format(char *format, int& value_digits, 
-		int& value_int_digits, bool scientific)
+	inline void set_format(char *format, double value, bool scientific)
 	{
 		if (!scientific)
 		{
-			unsigned int value_frac_digits = value_digits - value_int_digits;
 
-			if (value_frac_digits)
+			int int_digits = get_int_digits(value);
+			int frac_digits = get_frac_digits(value, MIN_RANGE_DIFF + 1);
+			int all_digits = int_digits + frac_digits;
+
+			// minus one for the dot in case the number has fractional digits
+			if (frac_digits)
 			{
-				// minus one for the dot in case the number has fractional digits
-				--value_frac_digits;
+				--frac_digits;
+				--all_digits;
 			}
 
 			format[0] = '%';
-			snprintf(&format[1], 2, "%u", value_int_digits);
+			snprintf(&format[1], 2, "%u", all_digits);
 			format[2] = '.';
-			snprintf(&format[3], 2, "%u", value_frac_digits);
+			snprintf(&format[3], 2, "%u", frac_digits);
 			format[4] = 'f';
 			format[5] = '\0';
 		}
@@ -108,13 +110,13 @@ namespace cpplot {
 	namespace Globals
 	{
 		// Maximum length of the ID (as wchar) of the Figure
-		static constexpr unsigned int size = 10;
+		static constexpr int size = 10;
 
 		// Buffer holding ID of the Figure
 		static wchar_t FigureName[size];
 
 		// ID of the current Figure
-		static unsigned int id = 0;
+		static int id = 0;
 
 		// Pointer to current Figure object
 		static cpplot::Figure *figure = nullptr;
@@ -130,11 +132,11 @@ namespace cpplot {
 	class Graph
 	{
 	public:
-		Graph(COLORREF in_color, unsigned int in_size) :
+		Graph(COLORREF in_color, int in_size) :
 			color(in_color), size(in_size), render_pointer(nullptr), 
 			ownership_render_pointer(true) {};
 
-		Graph(COLORREF in_color, unsigned int in_size, RenderObjects *render_ptr) :
+		Graph(COLORREF in_color, int in_size, RenderObjects *render_ptr) :
 			color(in_color), size(in_size), render_pointer(render_ptr),
 			ownership_render_pointer(false) {};
 
@@ -145,7 +147,7 @@ namespace cpplot {
 
 	protected:
 		COLORREF color;
-		unsigned int size;
+		int size;
 		RenderObjects *render_pointer;
 
 		bool ownership_render_pointer;
@@ -156,7 +158,7 @@ namespace cpplot {
 	{
 	public:
 		Scatter(const std::vector<double>& in_x,
-			const std::vector<double>& in_y, unsigned int in_size,
+			const std::vector<double>& in_y, int in_size,
 			COLORREF in_color, std::vector<double>& range,
 			RenderObjects *render_ptr);
 
@@ -174,7 +176,7 @@ namespace cpplot {
 	};
 
 	Scatter::Scatter(const std::vector<double>& in_x,
-		const std::vector<double>& in_y, unsigned int in_size,
+		const std::vector<double>& in_y, int in_size,
 		COLORREF in_color, std::vector<double>& range,
 		RenderObjects *render_ptr) : x{ in_x }, y{ in_y }, 
 		Graph(in_color, in_size, render_ptr)
@@ -241,7 +243,7 @@ namespace cpplot {
 	{
 	public:
 		Line(const std::vector<double>& in_x,
-			const std::vector<double>& in_y, unsigned int in_size,
+			const std::vector<double>& in_y, int in_size,
 			COLORREF in_color, std::vector<double>& range,
 			RenderObjects *render_ptr);
 
@@ -259,7 +261,7 @@ namespace cpplot {
 	};
 
 	Line::Line(const std::vector<double>& in_x,
-		const std::vector<double>& in_y, unsigned int in_size,
+		const std::vector<double>& in_y, int in_size,
 		COLORREF in_color, std::vector<double>& range,
 		RenderObjects *render_ptr) : Graph(in_color, in_size, render_ptr)
 	{
@@ -272,7 +274,7 @@ namespace cpplot {
 			ownership_render_pointer = true;
 		}
 
-		for (unsigned int i = 0; i != in_x.size(); ++i)
+		for (int i = 0; i != in_x.size(); ++i)
 		{
 			data[in_x[i]] = in_y[i]; // TODO : OPTIMIZE
 		}
@@ -307,7 +309,7 @@ namespace cpplot {
 		// Set appropriate graph properties and draw the lines
 		HPEN hGraphPen = CreatePen(PS_SOLID, size, color);
 		HPEN hGraphPreviousPen = (HPEN)SelectObject(hdc, hGraphPen);
-
+		
 		render_pointer->renderLines(hdc, data, rect, range);
 
 		// Delete graphics objects
@@ -329,14 +331,14 @@ namespace cpplot {
 	{
 	public:
 		Histogram(const std::vector<double>& in_x, const std::vector<double>& bins,
-			unsigned int in_size,COLORREF in_color, bool normed, std::vector<double>& range);
+			int in_size,COLORREF in_color, bool normed, std::vector<double>& range);
 
 		Histogram(const std::vector<double>& in_x, int bins, const std::vector<double>&
-			max_min_range, unsigned int in_size, COLORREF in_color, bool normed,
+			max_min_range, int in_size, COLORREF in_color, bool normed,
 			std::vector<double>& range);
 
 		virtual void initialize(const std::vector<double>& in_x,
-			const std::vector<double>& bins, unsigned int in_size, COLORREF in_color, 
+			const std::vector<double>& bins, int in_size, COLORREF in_color, 
 			bool normed, std::vector<double>& range);
 
 		virtual void show(HDC hdc, HWND hwnd, RECT rect,
@@ -349,7 +351,7 @@ namespace cpplot {
 	};
 
 	Histogram::Histogram(const std::vector<double>& in_x,
-		const std::vector<double>& bins, unsigned int in_size, COLORREF in_color, 
+		const std::vector<double>& bins, int in_size, COLORREF in_color, 
 		bool normed, std::vector<double>& range) : x(in_x), y(bins),
 		bin_pos(bins), Graph(in_color, in_size)
 	{
@@ -368,7 +370,7 @@ namespace cpplot {
 
 	Histogram::Histogram(const std::vector<double>& in_x,
 		int bins, const std::vector<double>& max_min_range, 
-		unsigned int in_size, COLORREF in_color,
+		int in_size, COLORREF in_color,
 		bool normed, std::vector<double>& range) : 
 		x(in_x), y(bins, 0.0), Graph(in_color, in_size)
 	{
@@ -410,7 +412,7 @@ namespace cpplot {
 	}
 
 	void Histogram::initialize(const std::vector<double>& in_x,
-		const std::vector<double>& bins, unsigned int in_size, 
+		const std::vector<double>& bins, int in_size, 
 		COLORREF in_color, bool normed, std::vector<double>& range)
 	{
 		std::sort(x.begin(), x.end());
@@ -421,10 +423,11 @@ namespace cpplot {
 		std::vector<double>::const_iterator x_iter = x.begin();
 
 		// Find the starting values for x
-		while(*x_iter++ < (*bin_pos_iter - FP_ERROR)) { }
-
+		while (*x_iter < (*bin_pos_iter - FP_ERROR)) { x_iter++; }
+	
 		// Fill the bins
 		double sum_y = 0.0;
+		int i = 0;
 		for (; bin_pos_iter != bin_pos.end(); bin_pos_iter++)
 		{
 			while (*x_iter < (*bin_pos_iter - FP_ERROR))
@@ -435,6 +438,8 @@ namespace cpplot {
 
 				if (x_iter == x.end()) { break; }
 			}
+
+			if (x_iter == x.end()) { break; }
 
 			++y_iter;
 		}
@@ -482,15 +487,15 @@ namespace cpplot {
 		// Render the histogram rectangles
 		RECT bin_rect;
 		bin_rect.bottom = rect.bottom -
-			(unsigned int)round((0.0 - adj_min_y) * win_length_y / length_y);
+			(int)round((0.0 - adj_min_y) * win_length_y / length_y);
 		for (int i = 0; i != bin_pos.size() - 1; i++)
 		{
 			bin_rect.left = rect.left +
-				(unsigned int)round((bin_pos[i] - adj_min_x) * win_length_x / length_x);
+				(int)round((bin_pos[i] - adj_min_x) * win_length_x / length_x);
 			bin_rect.right = rect.left +
-				(unsigned int)round((bin_pos[i + 1] - adj_min_x) * win_length_x / length_x);
+				(int)round((bin_pos[i + 1] - adj_min_x) * win_length_x / length_x);
 			bin_rect.top = rect.bottom -
-				(unsigned int)round((y[i] - adj_min_y) * win_length_y / length_y);
+				(int)round((y[i] - adj_min_y) * win_length_y / length_y);
 			Rectangle(hdc, bin_rect.left, bin_rect.top, bin_rect.right, bin_rect.bottom);
 		}
 
@@ -506,13 +511,13 @@ namespace cpplot {
 	class Axis
 	{
 	public:
-		Axis() : legend_state{ false } {};
+		Axis() : legend_state{ false }, x_value_state{ false }, y_value_state{ false } {};
 
 		void show_ticks(HDC hdc, HWND hwnd, RECT x_rect, RECT y_rect,
 			std::vector<double> range, HFONT font); // range by value!
 
 		void show_ticks_internal(HDC hdc, HWND hwnd, RECT rect,	std::vector<double>
-			range, TEXTMETRIC textMetric, RenderAxis *render);
+			range, TEXTMETRIC textMetric, RenderAxis *render, bool axis);
 
 		void tick_value_map(double diff, double& y_tick_period_adj,
 			double& y_value_period_adj);
@@ -545,10 +550,10 @@ namespace cpplot {
 		void set_title(std::string in_title) { title = in_title; }
 
 		void set_legend(std::string name, std::string type, COLORREF color,
-			unsigned int size, RenderObjects *render_ptr);
+			int size, RenderObjects *render_ptr);
 
 		void set_legend(std::string name, std::string type, COLORREF color,
-			unsigned int size);
+			int size);
 
 		void activate_legend() { legend_state = true; }
 
@@ -566,11 +571,11 @@ namespace cpplot {
 			LEGEND() = delete;
 
 			LEGEND(std::string in_name, std::string in_type, COLORREF in_color,
-				unsigned int in_size) : name(in_name), type(in_type), color(in_color),
+				int in_size) : name(in_name), type(in_type), color(in_color),
 				size(in_size), render_pointer(nullptr) {};
 
 			LEGEND(std::string in_name, std::string in_type, COLORREF in_color,
-				unsigned int in_size, RenderObjects *render_ptr);
+				int in_size, RenderObjects *render_ptr);
 
 			LEGEND(LEGEND& legend) : name(legend.name), type(legend.type),
 				color(legend.color), size(legend.size), 
@@ -585,7 +590,7 @@ namespace cpplot {
 			std::string name;
 			std::string type;
 			COLORREF color;
-			unsigned int size;
+			int size;
 			RenderObjects *render_pointer;
 
 			bool ownership_render_pointer;
@@ -596,11 +601,15 @@ namespace cpplot {
 		std::string title;
 		std::vector<LEGEND> legend;
 
+		// whether the legend has been activated
 		bool legend_state;
+
+		// whether values on x/y axis have already been adjusted for scientific notation
+		bool x_value_state, y_value_state; 
 	};
 
 	Axis::LEGEND::LEGEND(std::string in_name, std::string in_type, 
-		COLORREF in_color, unsigned int in_size, RenderObjects *render_ptr) :
+		COLORREF in_color, int in_size, RenderObjects *render_ptr) :
 		name(in_name), type(in_type), color(in_color), size(in_size),
 		ownership_render_pointer(false)
 	{
@@ -622,7 +631,7 @@ namespace cpplot {
 		else
 		{
 			printf("Warning: Unrecognized type for legend selected! Line pointer "
-				"initialized!");
+				"initialized!\n");
 
 			render_pointer = new RenderLinesFull();
 		}
@@ -640,7 +649,7 @@ namespace cpplot {
 		double& y_value_period_adj)
 	{
 		// nothing, multication or division group
-		unsigned int y_op_sign = 0;
+		int y_op_sign = 0;
 		double y_factor = 0.0;
 
 		// Find the multiplicative/divisive factor
@@ -706,11 +715,8 @@ namespace cpplot {
 	}
 
 	void Axis::show_ticks_internal(HDC hdc, HWND hwnd, RECT rect, std::vector<double>
-		range, TEXTMETRIC textMetric, RenderAxis *render)
+		range, TEXTMETRIC textMetric, RenderAxis *render, bool axis)
 	{
-		// TODO
-		static unsigned int call_counter = 0;
-
 		int stick = (int)(((rect.right - rect.left) -
 			2.0 * textMetric.tmHeight) / 3.0);
 
@@ -738,10 +744,20 @@ namespace cpplot {
 			range[0] = range[0] - add_on;
 			range[1] = range[1] - add_on;
 			
-			// TODO
 			if (add_on != 0)
 			{
-				ylabel += " [ " + std::to_string(add_on) + "+ ]";
+				if (axis && !y_value_state)
+				{
+					ylabel += " [ " + std::to_string(add_on) + "+ ]";
+
+					y_value_state = true;
+				}
+				else if(!x_value_state)
+				{
+					xlabel += " [ " + std::to_string(add_on) + "+ ]";
+
+					x_value_state = true;
+				}
 			}
 
 			// 6 is a constant because basic notation is: 
@@ -857,7 +873,7 @@ namespace cpplot {
 		wchar_t *wbuffer = new wchar_t[value_digits + 1];
 
 		char format[6];
-		set_format(format, value_digits, value_int_digits, scientific);
+		int snprintf_res;
 
 		// Render the text
 		while (value < range[1])
@@ -865,12 +881,19 @@ namespace cpplot {
 			y_coord = rect.bottom -
 				(int)round((value - range[0]) * win_length / length);
 
-			// + 1 in y_value_digits for null-termination
-			snprintf(sbuffer, value_digits + 1, format, value);
+			// Set the format for writing the current value to the sbuffer
+			set_format(format, value, scientific);
 
-			MultiByteToWideChar(CP_UTF8, 0, sbuffer, -1, wbuffer, value_digits + 1);
+			// Write the value to the sbuffer
+			snprintf_res = snprintf(sbuffer, value_digits + 1, format, value);
 
-			render->render_text(hdc, x_coord, y_coord, wbuffer, value_digits);
+			// Render only if writing to the sbuffer was successful
+			if (snprintf_res < (value_digits + 1) && snprintf_res > 0)
+			{
+				MultiByteToWideChar(CP_UTF8, 0, sbuffer, -1, wbuffer, value_digits + 1);
+
+				render->render_text(hdc, x_coord, y_coord, wbuffer, snprintf_res);
+			}
 
 			value += value_period;
 		}
@@ -888,7 +911,7 @@ namespace cpplot {
 		SelectObject(hdc, hBoxPen);
 
 		// Set proper text alignment
-		unsigned int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_TOP);
+		int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_TOP);
 
 		// Get parameters of current font -> for proper rendering of axis values
 		TEXTMETRIC textMetric;
@@ -898,7 +921,7 @@ namespace cpplot {
 		RenderAxisX renderX = RenderAxisX(x_rect);
 		std::vector<double> x_range{ range[0], range[1] };
 		RECT x_rect_flipped = {x_rect.top, x_rect.left, x_rect.bottom, x_rect.right};
-		this->show_ticks_internal(hdc, hwnd, x_rect_flipped, x_range, textMetric, &renderX);
+		this->show_ticks_internal(hdc, hwnd, x_rect_flipped, x_range, textMetric, &renderX, 0);
 
 		// Set bottom and center text alignment
 		SetTextAlign(hdc, TA_CENTER | TA_BOTTOM);
@@ -913,7 +936,7 @@ namespace cpplot {
 		// Render ticks on the y axis
 		RenderAxisY renderY = RenderAxisY();
 		std::vector<double> y_range{ range[2], range[3] };
-		this->show_ticks_internal(hdc, hwnd, y_rect, y_range, textMetric, &renderY);
+		this->show_ticks_internal(hdc, hwnd, y_rect, y_range, textMetric, &renderY, 1);
 
 		// Set text alignment and font that was in place before rendering axis attributes
 		SetTextAlign(hdc, prev_text_align);
@@ -925,15 +948,15 @@ namespace cpplot {
 	void Axis::show_xlabel(HDC hdc, HWND hwnd, RECT rect, HFONT font) const
 	{
 		// Set proper text alignment
-		unsigned int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_BOTTOM);
+		int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_BOTTOM);
 
 		// Set pen attribute
 		HPEN hBoxPen = CreatePen(PS_SOLID, 1, BLACK);
 		SelectObject(hdc, hBoxPen);
 
 		// Write the label of x axis
-		unsigned int x_coord_xlabel = (unsigned int)((rect.right + rect.left) * 0.5);
-		unsigned int y_coord_xlabel = rect.bottom;
+		int x_coord_xlabel = (int)((rect.right + rect.left) * 0.5);
+		int y_coord_xlabel = rect.bottom;
 		wchar_t *wide_xlabel = new wchar_t[xlabel.size() + 1];
 		MultiByteToWideChar(CP_UTF8, 0, xlabel.c_str(), -1, wide_xlabel, xlabel.size() + 1);
 		TextOut(hdc, x_coord_xlabel, y_coord_xlabel, wide_xlabel, xlabel.size());
@@ -949,7 +972,7 @@ namespace cpplot {
 	void Axis::show_ylabel(HDC hdc, HWND hwnd, RECT rect, HFONT font) const
 	{
 		// Set proper text alignment
-		unsigned int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_TOP);
+		int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_TOP);
 
 		// Set font rotated by 90 degrees
 		LOGFONT lf;
@@ -963,8 +986,8 @@ namespace cpplot {
 		HPEN hPreviousPen = (HPEN)SelectObject(hdc, hBoxPen);
 
 		// Write the label of y axis
-		unsigned int x_coord_ylabel = rect.left;
-		unsigned int y_coord_ylabel = (unsigned int)((rect.top + rect.bottom) * 0.5);
+		int x_coord_ylabel = rect.left;
+		int y_coord_ylabel = (int)((rect.top + rect.bottom) * 0.5);
 		wchar_t * wide_ylabel = new wchar_t[ylabel.size() + 1];
 		MultiByteToWideChar(CP_UTF8, 0, ylabel.c_str(), -1, wide_ylabel, ylabel.size() + 1);
 		TextOut(hdc, x_coord_ylabel, y_coord_ylabel, wide_ylabel, ylabel.size());
@@ -983,7 +1006,7 @@ namespace cpplot {
 	void Axis::show_title(HDC hdc, HWND hwnd, RECT rect, HFONT font) const
 	{
 		// Set proper text alignment
-		unsigned int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_TOP);
+		int prev_text_align = SetTextAlign(hdc, TA_CENTER | TA_TOP);
 
 		// Make the font bold
 		LOGFONT lf;
@@ -997,10 +1020,10 @@ namespace cpplot {
 		HPEN hPreviousPen = (HPEN)SelectObject(hdc, hBoxPen);
 
 		// Write the title
-		unsigned int x_coord_title = (unsigned int)((rect.right + rect.left) / 2);
-		unsigned int y_coord_title = rect.top;
+		int x_coord_title = (int)((rect.right + rect.left) / 2);
+		int y_coord_title = rect.top;
 		wchar_t * wide_title = new wchar_t[title.size() + 1];
-		MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wide_title, ylabel.size() + 1);
+		MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wide_title, title.size() + 1);
 		TextOut(hdc, x_coord_title, y_coord_title, wide_title, title.size());
 
 		delete[] wide_title;
@@ -1093,11 +1116,6 @@ namespace cpplot {
 					LEGEND_SYMBOL_LENGTH * 0.75));
 				Rectangle(hdc, hist_rect.left, hist_rect.top, hist_rect.right, hist_rect.bottom);
 			}
-			else
-			{
-				printf("Warning: Unsupported graph type. No legend symbol for this"
-					"plot written");
-			}
 
 			// Show the text associated with a given point/line
 			string_size = (it->name).size();
@@ -1158,12 +1176,12 @@ namespace cpplot {
 	double Axis::legend_offset(HDC hdc, int text_width, int base) const
 	{
 		// width of the rectangle available for text of the legend
-		unsigned int base_width = base - LEGEND_SYMBOL_LENGTH;
+		int base_width = base - LEGEND_SYMBOL_LENGTH;
 
 		// finding whether any string representing label names is longer
 		// than available width
-		unsigned int max_width = 0;
-		unsigned int string_width = 0;
+		int max_width = 0;
+		int string_width = 0;
 		for (std::vector<LEGEND>::const_iterator
 			it = legend.begin(); it != legend.end(); ++it)
 		{
@@ -1211,13 +1229,13 @@ namespace cpplot {
 	}
 
 	void Axis::set_legend(std::string name, std::string type, COLORREF color,
-		unsigned int size, RenderObjects *render_ptr)
+		int size, RenderObjects *render_ptr)
 	{
 		legend.emplace_back(name, type, color, size, render_ptr);
 	}
 
 	void Axis::set_legend(std::string name, std::string type, COLORREF color,
-		unsigned int size)
+		int size)
 	{
 		legend.emplace_back(name, type, color, size);
 	}
