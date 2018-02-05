@@ -4,4 +4,4 @@ The library runs only on Windows, however, only native libraries are used and th
 dependencies are required.
 
 ### Example
-Examples can be seen in the [example](https://github.com/ragoragino/cpplot/tree/master/examples) directory.
+Examples can be seen in the [examples](https://github.com/ragoragino/cpplot/tree/master/examples) directory.
