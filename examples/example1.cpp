@@ -28,7 +28,8 @@ int main()
 	plt.xlabel("Dimension 1");
 	plt.ylabel("Dimension 2");
 	plt.title("2-variate Normal Random Variable");
-	plt.save("example1", "png");
-	
+	// plt.save("example1", "png");
+	plt.show();
+
 	return 0;
 }

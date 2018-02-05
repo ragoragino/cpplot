@@ -357,17 +357,14 @@ namespace cpplot
 
 	Window::~Window()
 	{
-		if (active_graph >= 1)
+		// Deallocate individual Graph objects
+		for (int i = 0; i != active_graph; ++i)
 		{
-			// Deallocate individual Graph objects
-			for (int i = 0; i != active_graph; ++i)
-			{
-				delete graph[i];
-			}
-
-			// Deallocate the storage of Graph pointers
-			alloc.deallocate(graph, max_graphs);
+			delete graph[i];
 		}
+
+		// Deallocate the storage of Graph pointers
+		alloc.deallocate(graph, max_graphs);
 
 		// Delete Axis object
 		delete axis;
