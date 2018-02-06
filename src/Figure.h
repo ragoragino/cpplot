@@ -3,12 +3,6 @@
 #include "Bitmap.h"
 #include "Render.h"
 
-/*
-TODO:
-- exceptions
-- finish assymetric Figure constructor
-*/
-
 namespace cpplot
 {
 	int InitializeWindow(int width, int height);

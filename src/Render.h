@@ -113,7 +113,7 @@ namespace cpplot
 		virtual void renderLegend(HDC hdc, RECT pos);
 	};
 
-	void RenderScatterPoints::renderPoints(HDC hdc, const std::vector<double>& x,
+	inline void RenderScatterPoints::renderPoints(HDC hdc, const std::vector<double>& x,
 		const std::vector<double>& y, RECT rect, const std::vector<double>& range)
 	{
 		// Set adjusted min and max values, adjusted for the 
@@ -143,7 +143,7 @@ namespace cpplot
 		}
 	}
 
-	void RenderScatterPoints::renderLegend(HDC hdc, RECT pos)
+	inline void RenderScatterPoints::renderLegend(HDC hdc, RECT pos)
 	{
 		int x = (int)(0.5 * (pos.left + pos.right));
 		int y = (int)(0.5 * (pos.top + pos.bottom));
@@ -160,7 +160,7 @@ namespace cpplot
 		void renderLegend(HDC hdc, RECT pos);
 	};
 
-	void RenderScatterSquares::renderPoints(HDC hdc, const std::vector<double>& x,
+	inline void RenderScatterSquares::renderPoints(HDC hdc, const std::vector<double>& x,
 		const std::vector<double>& y, RECT rect, const std::vector<double>& range)
 	{
 		// Set adjusted min and max values, adjusted for the 
@@ -190,7 +190,7 @@ namespace cpplot
 		}
 	}
 
-	void RenderScatterSquares::renderLegend(HDC hdc, RECT pos)
+	inline void RenderScatterSquares::renderLegend(HDC hdc, RECT pos)
 	{
 		int x = (int)(0.5 * (pos.left + pos.right));
 		int y = (int)(0.5 * (pos.top + pos.bottom));
@@ -216,7 +216,7 @@ namespace cpplot
 		virtual void renderLegend(HDC hdc, RECT pos);
 	};
 
-	void RenderLinesFull::renderLines(HDC hdc, const std::map<double, double>& data, RECT rect,
+	inline void RenderLinesFull::renderLines(HDC hdc, const std::map<double, double>& data, RECT rect,
 		const std::vector<double>& range)
 	{
 		double min_x = range[0];
@@ -249,7 +249,7 @@ namespace cpplot
 		}
 	}
 
-	void RenderLinesFull::renderLegend(HDC hdc, RECT pos)
+	inline void RenderLinesFull::renderLegend(HDC hdc, RECT pos)
 	{
 		int begin_x = (int)(pos.left + 0.25 * (pos.right - pos.left));
 		int end_x = (int)(pos.left + 0.75 * (pos.right - pos.left));
@@ -299,7 +299,7 @@ namespace cpplot
 	};
 
 
-	void RenderLinesDotted::renderLines(HDC hdc, const std::map<double, double>& data, RECT rect,
+	inline void RenderLinesDotted::renderLines(HDC hdc, const std::map<double, double>& data, RECT rect,
 		const std::vector<double>& range)
 	{
 		double min_x = range[0];
@@ -387,7 +387,7 @@ namespace cpplot
 		}
 	}
 
-	void RenderLinesDotted::renderLegend(HDC hdc, RECT pos)
+	inline void RenderLinesDotted::renderLegend(HDC hdc, RECT pos)
 	{
 		int begin_x = (int)(pos.left + 0.25 * (pos.right - pos.left));
 		int end_x = (int)(pos.left + 0.75 * (pos.right - pos.left));
