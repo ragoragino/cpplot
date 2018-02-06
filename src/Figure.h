@@ -501,18 +501,18 @@ namespace cpplot
 	{
 		// Set the suffix type of saved image
 		wchar_t *ext_dir = new wchar_t[extension.size() + 1];
-		MultiByteToWideChar(CP_UTF8, 0, extension.c_str(), -1, ext_dir, extension.size() + 1);
+		MultiByteToWideChar(CP_UTF8, 0, extension.c_str(), -1, ext_dir, (int)extension.size() + 1);
 
 		// Allocate enough space to hold also the suffix of type 
 		// +2 because of dot and null termination
-		wchar_t *file_dir = new wchar_t[file.size() + extension.size() + 2];
+		wchar_t *file_dir = new wchar_t[file.size() + (int)extension.size() + 2];
 
 		// Copy the original string to the file_dir buffer
-		MultiByteToWideChar(CP_UTF8, 0, file.c_str(), -1, file_dir, file.size() + 1);
+		MultiByteToWideChar(CP_UTF8, 0, file.c_str(), -1, file_dir, (int)file.size() + 1);
 		file_dir[file.size()] = L'.';
 
 		// Copy the suffix type to the buffer
-		wcscpy_s(file_dir + file.size() + 1, extension.size() + 1, ext_dir);
+		wcscpy_s(file_dir + file.size() + 1, (int)extension.size() + 1, ext_dir);
 
 		// Set the Globals::dir and Globals::ext, so the CALLBACK function can see it
 		cpplot::Globals::dir = file_dir;

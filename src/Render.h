@@ -340,7 +340,7 @@ namespace cpplot
 			distance = norm(start_data, end_data);
 
 			// Render every second dot_length
-			while (true)
+			while (end_dot_length <= distance)
 			{
 				start_point = interpolate(start_data, end_data, start_dot_length / distance);
 				end_point = interpolate(start_data, end_data, end_dot_length / distance);
@@ -351,6 +351,7 @@ namespace cpplot
 				start_dot_length = norm(end_point, start_data) + dot_length;
 				end_dot_length = start_dot_length + dot_length;
 
+				// Adjust dot length for cases when the start should still start in this segment
 				if (end_dot_length > distance)
 				{
 					end_dot_length = dot_length;

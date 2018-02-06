@@ -958,8 +958,8 @@ namespace cpplot {
 		int x_coord_xlabel = (int)((rect.right + rect.left) * 0.5);
 		int y_coord_xlabel = rect.bottom;
 		wchar_t *wide_xlabel = new wchar_t[xlabel.size() + 1];
-		MultiByteToWideChar(CP_UTF8, 0, xlabel.c_str(), -1, wide_xlabel, xlabel.size() + 1);
-		TextOut(hdc, x_coord_xlabel, y_coord_xlabel, wide_xlabel, xlabel.size());
+		MultiByteToWideChar(CP_UTF8, 0, xlabel.c_str(), -1, wide_xlabel, (int)xlabel.size() + 1);
+		TextOut(hdc, x_coord_xlabel, y_coord_xlabel, wide_xlabel, (int)xlabel.size());
 
 		delete[] wide_xlabel;
 
@@ -989,8 +989,8 @@ namespace cpplot {
 		int x_coord_ylabel = rect.left;
 		int y_coord_ylabel = (int)((rect.top + rect.bottom) * 0.5);
 		wchar_t * wide_ylabel = new wchar_t[ylabel.size() + 1];
-		MultiByteToWideChar(CP_UTF8, 0, ylabel.c_str(), -1, wide_ylabel, ylabel.size() + 1);
-		TextOut(hdc, x_coord_ylabel, y_coord_ylabel, wide_ylabel, ylabel.size());
+		MultiByteToWideChar(CP_UTF8, 0, ylabel.c_str(), -1, wide_ylabel, (int)ylabel.size() + 1);
+		TextOut(hdc, x_coord_ylabel, y_coord_ylabel, wide_ylabel, (int)ylabel.size());
 
 		delete[] wide_ylabel;
 
@@ -1023,8 +1023,8 @@ namespace cpplot {
 		int x_coord_title = (int)((rect.right + rect.left) / 2);
 		int y_coord_title = rect.top;
 		wchar_t * wide_title = new wchar_t[title.size() + 1];
-		MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wide_title, title.size() + 1);
-		TextOut(hdc, x_coord_title, y_coord_title, wide_title, title.size());
+		MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wide_title, (int)title.size() + 1);
+		TextOut(hdc, x_coord_title, y_coord_title, wide_title, (int)title.size());
 
 		delete[] wide_title;
 
@@ -1072,8 +1072,10 @@ namespace cpplot {
 		// Get current graphic properties
 		HPEN hGraphPreviousPen = (HPEN)GetCurrentObject(hdc, OBJ_PEN);
 		HBRUSH hGraphPreviousBrush = (HBRUSH)GetCurrentObject(hdc, OBJ_BRUSH);
-		HPEN hGraphPen;
-		HBRUSH hGraphBrush;
+		
+		// This defintions are for the correctnes of deletion
+		HPEN hGraphPen = CreatePen(PS_SOLID, 1, BLACK);
+		HBRUSH hGraphBrush = CreateSolidBrush(BLACK);
 
 		for (std::vector<LEGEND>::const_iterator it = legend.begin();
 			it != legend.end(); ++it)
@@ -1081,8 +1083,8 @@ namespace cpplot {
 			// Set proper graphics attributes
 			hGraphPen = CreatePen(PS_SOLID, it->size, it->color);
 			hGraphBrush = CreateSolidBrush(it->color);
-			(HPEN)SelectObject(hdc, hGraphPen);
-			(HBRUSH)SelectObject(hdc, hGraphBrush);
+			SelectObject(hdc, hGraphPen);
+			SelectObject(hdc, hGraphBrush);
 
 			// Paint the point/line in the left column of the legend
 			point_pos_x = (int)((rect.left + LEGEND_SYMBOL_LENGTH * 0.5));
@@ -1118,7 +1120,7 @@ namespace cpplot {
 			}
 
 			// Show the text associated with a given point/line
-			string_size = (it->name).size();
+			string_size = (int)(it->name).size();
 			diff = string_size;
 			begin = 0;
 
@@ -1169,7 +1171,7 @@ namespace cpplot {
 		// Clean graphics objects
 		DeleteObject(hGraphPen);
 		DeleteObject(hGraphBrush);
-
+		
 		delete[] buffer;
 	}
 
@@ -1185,7 +1187,7 @@ namespace cpplot {
 		for (std::vector<LEGEND>::const_iterator
 			it = legend.begin(); it != legend.end(); ++it)
 		{
-			string_width = (it->name).size() * text_width;
+			string_width = (int)(it->name).size() * text_width;
 			if (string_width >= base_width)
 			{
 				return base_width;

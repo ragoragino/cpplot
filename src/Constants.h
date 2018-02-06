@@ -1,7 +1,7 @@
 #pragma once
 
 // define floating-point error comparison allowance
-#define FP_ERROR 0.00000001
+#define FP_ERROR 0.0000001
 
 // COLORS
 #define BLACK RGB(0, 0, 0)
