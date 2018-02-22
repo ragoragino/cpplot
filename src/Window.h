@@ -344,9 +344,12 @@ namespace cpplot
 		Graph **new_graph = alloc.allocate(max_graphs);
 
 		// Copy values from the original to the new storage
+		// Graph must be copy-constructible
 		for (int i = 0; i != active_graph; ++i)
 		{
 			new_graph[i] = graph[i];
+
+			delete graph[i];
 		}
 
 		// Deallocate original storage

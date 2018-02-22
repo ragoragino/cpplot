@@ -35,6 +35,6 @@ int main()
 	plt.hist(y, 100, {}, "", 1, BLUE, true, { 1, 0 });
 	plt.title("Histogram of a sample of exponentially distributed r.v.s, normalized");
 	plt.save("example3", "png");
-	
+
 	return 0;
 }
